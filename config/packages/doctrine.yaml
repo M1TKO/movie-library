@@ -1,0 +1,7 @@
+doctrine:
+    dbal:
+        driver: pdo_sqlite
+        path: '%env(resolve:DATABASE_PATH)%'
+        options:
+            2: 5
+        logging: false

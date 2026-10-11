@@ -1,0 +1,21 @@
+{
+    admin off
+    auto_https off
+    persist_config off
+    storage file_system {
+        root "{$APP_DATA_DIR}/caddy"
+    }
+}
+http://127.0.0.1:{$APP_HTTP_PORT} {
+    bind 127.0.0.1
+    root * "{$APP_PUBLIC_DIR}"
+    @private path /.env* /composer.* /router.php
+    respond @private 404
+    php_fastcgi 127.0.0.1:{$APP_FCGI_PORT} {
+        env APP_ENV prod
+        env APP_DEBUG 0
+        env APP_DATA_DIR "{$APP_DATA_DIR}"
+        read_timeout 30s
+    }
+    file_server
+}

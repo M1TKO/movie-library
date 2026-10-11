@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Movie Library{% endblock %}</title><link rel="stylesheet" href="/app.css"></head>
+<body>
+<header><a class="brand" href="{{ path('library') }}"><span class="mark">ML</span> Movie Library</a><span class="badge">LOCAL · PHASE 1</span>
+{% if app.user %}<form method="post" action="{{ path('logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}"><button class="subtle">Sign out</button></form>{% endif %}</header>
+{% if app.user %}<nav aria-label="Main navigation"><a href="{{ path('library') }}">Library</a><a href="{{ path('locations') }}">Locations</a><a href="{{ path('settings') }}">Settings</a></nav>{% endif %}
+<main>{% for type, messages in app.flashes %}{% for message in messages %}<p class="notice {{ type }}" role="status">{{ message }}</p>{% endfor %}{% endfor %}
+{% block body %}{% endblock %}</main><footer>Your collection, on your computer. Media files are never modified.</footer>
+</body></html>

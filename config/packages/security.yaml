@@ -1,0 +1,23 @@
+security:
+    password_hashers:
+        App\Security\Owner: auto
+    providers:
+        owner:
+            id: App\Security\OwnerProvider
+    firewalls:
+        main:
+            lazy: true
+            provider: owner
+            form_login:
+                login_path: login
+                check_path: login
+                enable_csrf: true
+                default_target_path: library
+            logout:
+                path: logout
+                target: login
+                enable_csrf: true
+    access_control:
+        - { path: '^/health$', roles: PUBLIC_ACCESS }
+        - { path: '^/(setup|login)$', roles: PUBLIC_ACCESS }
+        - { path: '^/', roles: ROLE_OWNER }

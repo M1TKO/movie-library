@@ -1,0 +1,15 @@
+framework:
+    messenger:
+        failure_transport: failed
+        transports:
+            filesystem:
+                dsn: 'doctrine://default'
+                options: { queue_name: filesystem, auto_setup: false, redeliver_timeout: 86400 }
+                retry_strategy: { max_retries: 3, delay: 1000, multiplier: 2 }
+            metadata:
+                dsn: 'doctrine://default'
+                options: { queue_name: metadata, auto_setup: false, redeliver_timeout: 3600 }
+                retry_strategy: { max_retries: 3, delay: 1000, multiplier: 2 }
+            failed:
+                dsn: 'doctrine://default'
+                options: { queue_name: failed, auto_setup: false }

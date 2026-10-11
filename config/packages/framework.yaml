@@ -1,0 +1,19 @@
+framework:
+    secret: '%env(APP_SECRET)%'
+    trusted_hosts: ['^localhost$', '^127\.0\.0\.1$', '^\[::1\]$']
+    csrf_protection: true
+    session:
+        handler_id: null
+        save_path: '%env(APP_DATA_DIR)%/sessions'
+        cookie_httponly: true
+        cookie_samesite: strict
+        cookie_secure: auto
+    router:
+        utf8: true
+    php_errors:
+        log: true
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file

@@ -1,0 +1,5 @@
+{% extends 'base.html.twig' %}
+{% block body %}<p class="eyebrow">THE COLLECTION</p><h1>Your library</h1><p class="muted">A place for your movies, series, and every copy you keep.</p>
+<div class="stats"><article class="panel"><span>Configured locations</span><strong>{{ locationCount }}</strong></article><article class="panel"><span>Access</span><strong class="word">This computer</strong></article><article class="panel"><span>Implementation</span><strong class="word">Foundation</strong></article></div>
+<section class="panel empty"><div class="reel" aria-hidden="true">▤</div><h2>Start with your media locations</h2><p>Save the folders where you keep movies and TV shows.<br>Scanning and catalog browsing arrive in the next implementation phase.</p><a class="button" href="{{ path('locations') }}">Manage locations</a></section>
+<section class="panel"><h2>What’s ready</h2><p>Owner login, persistent settings, and media location configuration.</p><p class="muted">Discovery, availability checks, metadata matching, and watched status are still being built. No drives are scanned automatically.</p></section>{% endblock %}

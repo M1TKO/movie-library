@@ -1,0 +1,6 @@
+{% extends 'base.html.twig' %}
+{% block title %}Sign in · Movie Library{% endblock %}
+{% block body %}<section class="auth panel"><p class="eyebrow">YOUR PRIVATE LIBRARY</p><h1>Welcome back.</h1><p class="muted">Sign in as the library owner.</p>
+{% if error %}<p class="notice error" role="alert">Sign-in failed. Check your password and try again.</p>{% endif %}
+<form method="post" action="{{ path('login') }}"><input type="hidden" name="_username" value="owner"><input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+<label for="password">Password</label><input id="password" type="password" name="_password" autocomplete="current-password" required autofocus><button>Sign in</button></form></section>{% endblock %}
