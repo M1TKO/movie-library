@@ -1,0 +1,6 @@
+{% extends 'base.html.twig' %}
+{% block body %}<h1>Relocate location</h1><p>Current root: <code>{{ location.root_path }}</code></p>
+<p>Confirm that the new root represents this same collection. Relative paths, catalog identities, watched state and history are retained. The proposed paths will be checked after confirmation.</p>
+{% if error %}<p class="notice error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" class="panel"><input type="hidden" name="_token" value="{{ csrf_token('relocate-' ~ location.id) }}"><label for="new-path">New root on the host</label><input id="new-path" name="path" required value="{{ target }}"><button name="action" value="preview">Preview relocation</button>
+{% if preview is not null %}<p>{{ preview.accessible ? 'New root is accessible.' : 'New root could not be verified; files will retain last-known availability.' }}</p><h2>Proposed relative paths (first 50)</h2>{% for file in files %}<p><code>{{ target }}/{{ file.relative_path }}</code></p>{% else %}<p>No catalog files yet.</p>{% endfor %}<button name="action" value="confirm">Confirm this is the same collection and update catalog paths</button>{% endif %}</form>{% endblock %}

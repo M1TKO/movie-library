@@ -1,4 +1,50 @@
-# Validation record
+# Latest validation — 12 October 2026
+
+Phase 4 implementation complete, with Windows deterministic validation. Phase 3 outstanding acceptance items remain unchanged. No live TMDB credential or owner media was used.
+
+- Full Windows PHPUnit: **84 tests, 393 assertions passed, no skips**, with project-local FFmpeg/FFprobe 9.0.2. Focused Phase 4 rerun after the final dispatch-coalescing fix: **17 tests, 128 assertions passed**.
+- Composer strict validation, container lint and all **17 Twig templates** pass. Fresh migration of all four versions succeeds, including metadata aliases/redirects and series audit references.
+- Symfony HttpClient **7.4.20** and contracts **3.7.3** are locked; OpenSSL is declared/checked. Production runtime smoke: **19 checks passed**, including the bundled attribution asset, OpenSSL web readiness, both queues, shutdown/restart, and worker failure cleanup.
+- MockHttpClient validates encrypted/backend-only credentials, rejected-token redaction, language-specific cache reuse without credentials, 503 retry, bounded Retry-After handling, oversized responses, fixed-host poster requests and offline cache reuse/placeholders.
+- Deterministic ranking tests establish exact-title/year requirements, original-title matching, no automatic match with missing/wrong year, close-candidate ambiguity, unmatched results and locked owner confirmation.
+- Identity tests preserve copies, watched values, history snapshots and filename aliases through merges; subsequent discovery reuses the merged identity. Unrelated reassignment keeps previous watched state separately. Stale queued/in-flight responses cannot replace a newer owner edit; cancelled work does not apply metadata.
+- TV tests enrich only owned season-zero and multi-episode entries, store season/episode identities and titles, retain watched state and allow manual numbering correction without creating provider-only episodes.
+- Authenticated BrowserKit workflow covers credential/language settings, CSRF rejection, unresolved movie/TV assignment, local title/IMDb correction, placeholders and series IMDb fallback, queued search and metadata progress. A **real metadata worker** consumes the durable failed-offline lookup, marks old running metadata jobs Interrupted and leaves filesystem jobs independent. Old merged URLs redirect; anonymous requests cannot read metadata pages or posters.
+- Existing discovery/availability/probe regressions pass. No operation scans an owner-selected real collection or writes media.
+
+| Phase 4 acceptance | Evidence / limit |
+|---|---|
+| AC-06 | Local parsing plus deterministic movie provider search/ranking/enrichment pass. Live identification is unverified. |
+| AC-07 | Owned TV, seasons, specials and multi-episode enrichment/correction pass with fixtures. Live TV data is unverified. |
+| AC-08 | Ambiguity/review/manual confirmation and correction lock across rescan pass. |
+| AC-09 | Confirmed IMDb URL validation, episode/series fallback, authenticated local poster cache and absent-image placeholder pass. Live image delivery is unverified. |
+| AC-23 | Discovery/browsing/check regressions need no token; provider failure retains local identities, watched state and copies. |
+| AC-24 | Mocked 503/429 backoff, short cooldown bounds, durable failed state and manual retry pass. Actual TMDB throttling is unverified. |
+| AC-27 | Correction operates only on SQLite; existing discovery tests verify synthetic media byte preservation. No new media-write operations were added. |
+
+**Remaining environment validation:** Linux current-code execution is pending because the installed Docker daemon is not running; its existing harness installs the new dependency and runs all tests. Live TMDB validation is optional and unperformed because no owner credential was provided. A real browser's visual/end-to-end metadata workflow is unverified; functional HTML/forms are tested through BrowserKit. No complete cross-platform acceptance or release readiness is claimed. [TMDB guide](TMDB.md) documents setup, bounds, correction semantics and the optional live check.
+
+The first sandboxed Windows production smoke attempt could not terminate owned children. Its isolated supervisor/process tree was verified and cleaned up with elevated process access; the subsequent full smoke run passed. This was an execution-sandbox limitation, not a metadata failure.
+
+# Latest validation â€” 12 October 2026
+
+Phase 2 implementation complete; Phase 3 implementation started. Windows PHP 8.2.0 / SQLite 3.39.2. Historical Phase 1 Linux results below do not validate the new Phase 2/3 code.
+
+- Full Windows PHPUnit: **66 tests, 261 assertions passed**, including real FFmpeg/FFprobe 9.0.2 generated video and corrupt media; no skipped tests. An additional availability-timeout test passed separately (**1 test, 4 assertions**).
+- Composer strict validation, container lint and all **13 Twig templates** pass.
+- Supervised Caddy/PHP FastCGI runtime: **18 checks passed**. Restart with synthetic known catalog data queues exactly one backend-start check, offline checks preserve last-known state, and ordinary HTTP requests do not repeat that trigger. Both workers, private-file protection, ownership and failure cleanup still pass.
+- Existing Phase 2 tests cover overlapping roots, physical identity, repeat scans, exclusions/extensions, non-recursion, unresolved files, parsing, multi-episode links, incremental inspection, changing-file retry, bounded root timeout, active cancellation/heartbeat, interruption recovery, symlinks/Windows junction avoidance, location scope changes, disabled memberships, removal and media byte preservation.
+- New Phase 2 completion evidence: explicit relocation preserves file identity, links, watched/manual-lock values and path history, then known-path verification succeeds. Conflicting destination configurations are rejected without partial mutation.
+- Phase 3 evidence: known-path checks do not add newly appearing files or re-probe existing copies; missing/restored transitions retain last-seen state and avoid repeated missing events; offline roots and no-longer-monitored copies retain last-known availability. Durable consumption, queued cancellation, restart interruption, timeout, session debounce, equivalent scan coalescing, authenticated/CSRF-protected manual checks and once-per-session web behavior pass.
+- Completed file outcomes commit after each root; an interruption retains these commits. Root timeout/cancellation never infers absence from unfinished checks. Every completed check records unchanged outcomes as well as changes/errors.
+
+Remaining Phase 3 acceptance: successful-area discovery reconciliation, paginated title/file event history, progress refinements, concurrent dispatch, active-check cancellation and interrupted partial-result scenarios, actual ACL denial/hanging network shares, and performance tests. File history currently displays the latest 50 changes.
+
+**Linux revalidation is pending:** Docker CLI is installed but its daemon is not running. The Linux harness includes FFmpeg and all new tests; no updated Linux result is claimed. No owner media was scanned. Tests mutate only generated synthetic fixtures. Live storage, LAN, TMDB, host playback and backup/restore remain unverified.
+
+## Historical Phase 1 evidence
+
+### Validation record
 
 Date: 2026-10-11. Phase: **1 complete**. Windows: PHP 8.2.0, SQLite 3.39.2. Debian Linux container: PHP 8.2.34, SQLite 3.40.1. Both: Caddy 2.11.7, Symfony 7.4.20, PHPUnit 11.5.57.
 

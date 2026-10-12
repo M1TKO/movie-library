@@ -2,7 +2,7 @@
 
 A personal movie and TV catalog for **Windows and Linux**, implemented in phases from [the project specification](Movie-Library-Specification.md). Both platforms are required release targets.
 
-**Phase 1 is complete.** Owner setup/login, location configuration, the full catalog/job schema, durable queues, worker health, and supervised Caddy/PHP FastCGI startup are implemented and tested on Windows and Linux. Discovery and catalog browsing, availability handlers, TMDB, and playback remain later-phase features. See [IMPLEMENTATION.md](IMPLEMENTATION.md) and [validation results](docs/VALIDATION.md).
+**Phases 2 and 4 are implemented; Phase 3 acceptance is underway.** Scan selected locations manually, browse movies/TV and unresolved copies, inspect files with FFprobe, manage or relocate roots while retaining history, and check known-path availability in the background. Startup and fresh library sessions request availability checks; these never discover new files or re-probe media. TMDB enrichment, match review/correction, cached posters and confirmed IMDb links are available; full library controls, playback and release features remain later work. Configure optional metadata in Settings; see [TMDB setup and correction](docs/TMDB.md). Windows validation passes; updated Linux validation is pending because Docker's daemon is unavailable. See [IMPLEMENTATION.md](IMPLEMENTATION.md) and [validation results](docs/VALIDATION.md).
 
 ## Normal application startup
 
@@ -48,7 +48,7 @@ bash scripts/start-dev.sh
 
 The Linux development server runs in the foreground; **Ctrl+C** stops it. An optional first argument selects the port: `bash scripts/start-dev.sh 8001`. Logs go to the terminal. No detached process or stop script is needed for this development mode.
 
-Open **http://127.0.0.1:8000**. Create your owner password (at least 12 characters), sign in, then open **Locations** to save absolute paths on the backend host. Windows accepts drive/UNC paths; Linux accepts paths such as `/mnt/media/Movies`, including mounted network storage. Windows identity is case-insensitive; Linux preserves case and meaningful filename characters. Linux paths containing `..` are rejected to avoid incorrectly resolving symlinks. Labels, recursion, content type, and enabled state are stored. Offline paths can be saved; access has not yet been checked. Adding a location never scans it. Only one owner account can be created, and setup is restricted to the host's loopback address.
+Open **http://127.0.0.1:8000**. Create your owner password (at least 12 characters), sign in, then open **Locations** to save absolute paths on the backend host. Windows accepts drive/UNC paths; Linux accepts paths such as `/mnt/media/Movies`, including mounted network storage. Windows identity is case-insensitive; Linux preserves case and meaningful filename characters. Linux paths containing `..` are rejected to avoid incorrectly resolving symlinks. Labels, recursion, content type, and enabled state are stored. Offline paths can be saved with a warning; root validation and the host folder browser have bounded timeouts. Adding a location never scans it. Only one owner account can be created, and setup is restricted to the host's loopback address.
 
 Stop this application's development server:
 
@@ -64,7 +64,7 @@ These development-only launchers use PHP's **development server**, bound exclusi
 
 Tested on Windows with PHP **8.2.0** / SQLite **3.39.2** and on Debian Linux with PHP **8.2.34** / SQLite **3.40.1**; both use Caddy **2.11.7**, Symfony **7.4.20**, Doctrine DBAL **3.10.6**, and PHPUnit **11.5.57**. Dependencies are pinned in `composer.lock`. Symfony 7.4 is the supported LTS compatible with PHP 8.2 ([official release information](https://symfony.com/releases/7.4)). Update the old installed Windows PHP patch release before LAN deployment; no system PHP installation was changed.
 
-Required extensions are checked by `scripts/Check-Dependencies.ps1`: ctype, iconv, PDO SQLite, session, mbstring, DOM, XML, and XMLWriter. Composer additionally validates package platform requirements. FFprobe was not found on PATH; this does not prevent foundation use. A tested FFprobe installation and explicit executable setting are phase 2 work.
+Required extensions are checked by `scripts/Check-Dependencies.ps1`: ctype, iconv, PDO SQLite, session, mbstring, DOM, XML, XMLWriter, and OpenSSL. Composer additionally validates package platform requirements. FFprobe need not be on PATH if its full executable path is configured. Missing or failed inspection retains files with an explicit error. Set the FFprobe executable in Settings and use Validate FFprobe. A project-local FFmpeg/FFprobe 9.0.2 installation was exercised with generated video and corrupt-file fixtures; these binaries are ignored by Git.
 
 ## Files and data
 
@@ -80,6 +80,8 @@ Required extensions are checked by `scripts/Check-Dependencies.ps1`: ctype, icon
 | Default data for direct PHP commands on Linux | `$XDG_DATA_HOME/movie-library`, fallback `~/.local/share/movie-library` |
 | Normal launcher database / secret / sessions | `library.sqlite`, `app.secret`, `sessions/` under the platform data directory above |
 | Normal launcher logs / runtime ownership | `logs/{http,php-fastcgi,filesystem,metadata}.log`, `runtime.json` under the platform data directory |
+| TMDB encrypted credential (excluded from catalog backups) | `tmdb.secret` under APP_DATA_DIR |
+| Poster cache (bounded to 100 MiB) | `posters/` under APP_DATA_DIR |
 | Backup outputs | Not implemented yet |
 
 The development launcher explicitly sets `APP_DATA_DIR` to `var/dev`; tests force `var/test` regardless of inherited settings. To choose another local data directory for development, set `$env:APP_DATA_DIR` before both start and stop. Keep SQLite on a local disk. For manual console commands against the development database, set it as follows:
@@ -102,12 +104,14 @@ composer validate --strict
 
 Tests use synthetic paths and a separate SQLite database. They do not scan, change, or remove media. `composer check` validates dependency injection and Twig templates. Detailed acceptance coverage and manual limitations are in `docs/VALIDATION.md`.
 
-## Implementation decisions
+## Catalog and availability behavior
 
-- Migrations cover owner/settings/locations, catalog identities and copies, matching/cache, audit history, queues and worker health. Schema constraints are tested; feature services and catalog screens arrive in the later phases.
-- Doctrine DBAL and Migrations implement current persistence; ORM mappings will be introduced with catalog entities if useful. This retains the specified Symfony/Doctrine/SQLite stack.
-- The current Twig forms require no JavaScript or external CDN. HTMX will be added for job progress and partial page updates when those features exist.
-- Manual path entry is implemented. Host folder browsing, bounded accessibility checks, exclusions, relocation, and removal semantics are tracked in phase 2. Current paths are honestly displayed as not yet checked.
-- TMDB configuration, match correction, LAN access, host actions, and backup/restore remain pending. Worker diagnosis is available in Settings and documented in `docs/RUNTIME.md`.
+Discovery runs only after an authenticated manual request for selected roots. Jobs persist and coalesce duplicate requests; progress and every-file outcomes are available in Job history. Cancelled, failed and interrupted jobs retain completed results. Start workers with the normal launcher; development-only HTTP launchers leave jobs queued.
 
-For the next implementation session, start with the **Next task** in `IMPLEMENTATION.md`, update its checkboxes as work lands, and add evidence to `docs/VALIDATION.md`. Linux runtime validation uses an isolated Debian container running native Linux PHP/Caddy processes; desktop integration and real storage are not covered by that environment.
+Available and Missing are verified states. Offline, access-denied and failed checks preserve last-known availability and last-seen timestamps. Disabled/removed or excluded memberships become Not monitored unless another enabled root still covers the copy. Repeated absence does not repeat missing events; returning copies receive restoration events. Checks use only known paths, with a 30-second root subprocess timeout and a 30-minute run limit. Session-triggered checks debounce for 60 seconds and equivalent full scans are reused.
+
+Relocation is available from Edit location. Preview the new root and relative paths, explicitly confirm it represents the same collection, then let queued checks verify the paths. Relocation changes only catalog paths and retains IDs, watched state and history. Shared overlapping memberships and existing destination identities are rejected; resolve those configurations first. No application operation moves, writes or deletes media.
+
+Discovery currently retains unseen records until an availability check verifies them; reconciliation of successfully enumerated discovery areas remains Phase 3 work. File history shows the latest 50 events; full event pagination and title history remain pending. Linux revalidation, real external/network storage, ACL failures and large-library performance are explicitly unverified.
+
+For continuation, use the **Next task** in [IMPLEMENTATION.md](IMPLEMENTATION.md) and record evidence in [docs/VALIDATION.md](docs/VALIDATION.md).

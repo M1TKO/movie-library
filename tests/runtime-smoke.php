@@ -38,6 +38,7 @@ try {
     $assert($health['php']===PHP_VERSION,'Web/CLI version mismatch');
     $assert(str_contains(file_get_contents('http://127.0.0.1:'.$port.'/setup'),'Create owner account'),'Setup HTML missing');
     $assert(str_contains(file_get_contents('http://127.0.0.1:'.$port.'/app.css'),':root'),'Stylesheet not served');
+    $assert(str_contains(file_get_contents('http://127.0.0.1:'.$port.'/tmdb-logo.svg'),'<svg'),'TMDB attribution logo not served');
     $context=stream_context_create(['http'=>['ignore_errors'=>true]]);
     $private=file_get_contents('http://127.0.0.1:'.$port.'/.env',false,$context);
     $assert(str_contains($http_response_header[0],'404'),'Private config request not rejected');
@@ -48,6 +49,8 @@ try {
     $db=new PDO('sqlite:'.$data.'/library.sqlite');
     $assert((int)$db->query('SELECT COUNT(*) FROM worker_receipts')->fetchColumn()===2,'Both queues must acknowledge startup');
     $db->exec("INSERT INTO locations(label,root_path,normalized_root,created_at) VALUES('Persistence fixture','/synthetic','/synthetic','2026-10-11T00:00:00Z')");
+    $db->exec("INSERT INTO media_files(original_path,normalized_path,filename,last_known_availability,created_at,updated_at) VALUES('/synthetic/known.mkv','/synthetic/known.mkv','known.mkv','available','2026-10-11T00:00:00Z','2026-10-11T00:00:00Z')");
+    $db->exec('INSERT INTO file_locations(file_id,location_id,relative_path) SELECT f.id,l.id,\'known.mkv\' FROM media_files f CROSS JOIN locations l');
     $stop();
     $assert($server->isSuccessful(),'Supervisor did not exit cleanly');
     clearstatcache(true,$data.'/runtime.json');
@@ -55,6 +58,12 @@ try {
     $assert((int)$db->query("SELECT COUNT(*) FROM worker_health WHERE state='stopped'")->fetchColumn()===2,'Workers not recorded as stopped');
     $start();
     $assert($db->query('SELECT label FROM locations')->fetchColumn()==='Persistence fixture','Migration/restart lost saved data');
+    $deadline = microtime(true)+10;
+    while (microtime(true)<$deadline && !(int)$db->query("SELECT COUNT(*) FROM runs WHERE job_type='availability' AND state IN ('completed','completed_with_errors')")->fetchColumn()) { usleep(100000); }
+    $assert((int)$db->query("SELECT COUNT(*) FROM runs WHERE job_type='availability' AND trigger_name='backend_start'")->fetchColumn()===1,'Restart must enqueue exactly one availability check');
+    $assert($db->query('SELECT last_known_availability FROM media_files')->fetchColumn()==='available','Offline startup must retain last-known availability');
+    file_get_contents('http://127.0.0.1:'.$port.'/health');
+    $assert((int)$db->query("SELECT COUNT(*) FROM runs WHERE job_type='availability'")->fetchColumn()===1,'HTTP requests must not repeat backend-start checks');
     $state=json_decode(file_get_contents($data.'/runtime.json'),true);
     $workerPid=$state['children']['metadata'];
     // Kill only the synthetic supervisor's recorded child to verify failure propagation.

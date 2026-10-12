@@ -1,6 +1,6 @@
 # Implementation progress
 
-Last updated: 2026-10-11. Baseline: `Movie-Library-Specification.md` v1.3.
+Last updated: 2026-10-12. Baseline: `Movie-Library-Specification.md` v1.3.
 
 **Mandatory platform requirement: Windows AND Linux.** All phases must preserve native operation on both; do not add Windows-only assumptions to shared code. Use platform adapters for paths, process control, host actions and permissions. Existing Windows-only wording below describes historical validation, not reduced scope.
 
@@ -16,9 +16,9 @@ This file tracks implementation, not just planning. `[x]` means implemented and 
 
 ## Current position
 
-**Phase 1 is complete.** Owner authentication, location configuration, the catalog/job/audit schema, two durable queues, worker health and ownership, and supervised Caddy/PHP FastCGI launch/stop are implemented. Windows and Debian Linux tests and runtime smoke checks pass. This foundation does not yet discover or browse media; those are Phase 2 features. Linux desktop and real-drive validation remain release work.
+**Phase 2 and Phase 4 implementation are complete; Phase 3 acceptance remains in progress.** Durable manual discovery, bounded read-only traversal/probing, local movie/TV parsing, unresolved-file browsing, overlapping memberships, catalog-preserving location management and explicit relocation are implemented. Windows automated validation includes real FFprobe and supervised startup; the updated Linux harness awaits a running Docker daemon. Do not claim complete cross-platform acceptance until that run passes.
 
-**Next task: phase 2A, local catalog and durable manual discovery.** Build repositories/services against the existing schema, then implement run dispatch/coalescing, bounded traversal, file/membership upserts and cancellation-safe outcomes on the existing filesystem queue. Add a browser manual-scan action only once those invariants are tested. Use synthetic fixtures; never select or scan arbitrary user drives.
+**Next task: finish Phase 3 availability/history acceptance, then Phase 5 library experience.** Known-path checks, launch/session triggers, debounce/coalescing, retained last-known state, missing/restored events, root-level durable partial results, cancellation, restart recovery, manual retry and run/file-history views are implemented. Remaining work: successful-area discovery reconciliation, paginated title/file event history, richer progress/global job indicators, concurrent-dispatch and active-check cancellation evidence, real ACL/offline-share tests, and Linux validation. Use synthetic fixtures; never scan arbitrary owner drives.
 
 ## Phase 1 — Foundation
 
@@ -45,40 +45,40 @@ This file tracks implementation, not just planning. `[x]` means implemented and 
 ### 2A: safe manual discovery
 
 - [x] Migrations for movies, series, seasons, episodes, files, memberships, content links; enforce uniqueness and exactly-one content target.
-- [ ] Catalog repositories/domain services and optional ORM mappings against the existing schema.
-- [ ] Keep unlinked/unresolved files visible independently of title identification.
+- [x] Catalog repositories/domain services and optional ORM mappings against the existing schema.
+- [x] Keep unlinked/unresolved files visible independently of title identification.
 - [x] Add Symfony Messenger Doctrine transport, filesystem/metadata/failure queues, and exclusive worker locks.
-- [ ] Persistent runs/options/root results and per-file outcomes; atomic job coalescing and idempotency.
+- [x] Persistent runs/options/root results and per-file outcomes; atomic job coalescing and idempotency.
 - [x] One filesystem worker per data directory, ownership/idle heartbeat, worker health UI.
-- [ ] Bounded scan handler duration, active-job heartbeat/keepalive and ownership-aware recovery before long-running jobs are enabled.
-- [ ] Add host folder browser; bounded root-access validation; save inaccessible roots with warning.
-- [ ] Per-root exclusions, supported extensions, recursion, junction/symlink avoidance.
-- [ ] Manual scan all/one; queue immediately, show progress with locally bundled HTMX.
-- [ ] Bounded root subprocesses so an unavailable share cannot hang the worker indefinitely.
-- [ ] Upsert normalized physical paths; preserve memberships across overlapping roots.
-- [ ] Cancellation and partial traversal never mark unseen files missing.
-- [ ] Location edit/disable/removal/relocation semantics preserve files and history.
+- [x] Bounded scan handler duration, active-job heartbeat/keepalive and ownership-aware recovery before long-running jobs are enabled.
+- [x] Add host folder browser; bounded root-access validation; save inaccessible roots with warning.
+- [x] Per-root exclusions, supported extensions, recursion, junction/symlink avoidance.
+- [x] Manual scan all/one; queue immediately, show progress with locally bundled HTMX.
+- [x] Bounded root subprocesses so an unavailable share cannot hang the worker indefinitely.
+- [x] Upsert normalized physical paths; preserve memberships across overlapping roots.
+- [x] Cancellation and partial traversal never mark unseen files missing.
+- [x] Location edit/disable/removal/relocation semantics preserve files and history. Relocation previews relative paths, requires explicit confirmation and queues verification; overlapping memberships and destination collisions are rejected atomically.
 
 ### 2B: parsing, inspection, browsing
 
-- [ ] Tested parser for title/year, release tags, folder fallback, SxxExx, 1x03, specials, multi-episode files, Unicode, numeric titles, unresolved cases.
-- [ ] FFprobe installation validation and configurable executable; argument-array Process invocation, timeout, main stream selection.
-- [ ] Store exact bytes, dimensions, duration, codecs, inspection timestamp/error; retain corrupt files.
-- [ ] Incremental size/mtime inspection; handle changing files without inventing metadata.
-- [ ] Offline library pagination, distinct titles/copies, unresolved counts, movie/TV detail pages.
-- [ ] Preserve manual match locks and watched state across upserts.
-- [ ] Test synthetic discovery, overlap, repeat scans, formats/exclusions, multi-episode links, and probe failures.
+- [x] Tested parser for title/year, release tags, folder fallback, SxxExx, 1x03, specials, multi-episode files, Unicode, numeric titles, unresolved cases.
+- [x] FFprobe installation validation and configurable executable; argument-array Process invocation, timeout, main stream selection.
+- [x] Store exact bytes, dimensions, duration, codecs, inspection timestamp/error; retain corrupt files.
+- [x] Incremental size/mtime inspection; handle changing files without inventing metadata.
+- [x] Offline library pagination, distinct titles/copies, unresolved counts, movie/TV detail pages.
+- [x] Preserve manual match locks and watched state across upserts.
+- [x] Test synthetic discovery, overlap, repeat scans, formats/exclusions, multi-episode links, and probe failures.
 
 Exit evidence: offline manual discovery through the browser; AC-03–07, AC-10–11, AC-17, AC-21, AC-23, AC-27 coverage, with explicit partial statuses as appropriate.
 
 ## Phase 3 — Availability and history
 
-- [ ] Backend launch once-per-launch and fresh-library-session check triggers, 60-second debounce/coalescing.
-- [ ] Check only known paths; never recursively discover or re-probe during availability checks.
-- [ ] Separate last-known state from latest outcome; missing/offline/access-denied/failed/not-monitored/unknown reasons.
-- [ ] Respect overlapping enabled roots and changed scan scope.
+- [x] Backend launch once-per-launch and fresh-library-session check triggers, 60-second debounce/coalescing.
+- [x] Check only known paths; never recursively discover or re-probe during availability checks.
+- [x] Separate last-known state from latest outcome; missing/offline/access-denied/failed/not-monitored/unknown reasons.
+- [x] Respect overlapping enabled roots and changed scan scope.
 - [ ] Reconcile only successful areas; distinguish root failures from per-file outcomes.
-- [ ] Preserve last-seen and restoration transitions; do not repeat missing events for unchanged files.
+- [x] Preserve last-seen and restoration transitions; do not repeat missing events for unchanged files.
 - [ ] Cooperative cancellation, interruption recovery, durable partial results, retry.
 - [ ] Paginated run list, progress, summaries, every-file outcomes (including unchanged), title/file event history.
 - [ ] Validate ACL denial, offline drive, hanging share, cancellation, concurrent dispatch and worker restart.
@@ -87,14 +87,14 @@ Exit evidence: AC-12–19; no false missing transitions under errors or incomple
 
 ## Phase 4 — Online metadata
 
-- [ ] Backend-only TMDB credential storage/validation, language settings, attribution.
-- [ ] HttpClient provider interface, cache, bounded retries/backoff/rate limits, separate enrichment queue.
-- [ ] Search ranking with evidence/thresholds, pending/ambiguous/unmatched states.
-- [ ] Posters with bounded cache, confirmed IMDb IDs/links, offline placeholders.
-- [ ] Review/search/manual confirmation, local title edits, validated IMDb URL, explicit rematch.
-- [ ] Lock manual matches; merge provider identities without losing histories or watched state; distinguish unrelated reassignment.
-- [ ] TV season/episode lookup, multi-episode correction, specials and uncertain numbering.
-- [ ] Deterministic mocked tests; optional live credential test documented separately.
+- [x] Backend-only TMDB credential storage/validation, language settings, attribution.
+- [x] HttpClient provider interface, cache, bounded retries/backoff/rate limits, separate enrichment queue.
+- [x] Search ranking with evidence/thresholds, pending/ambiguous/unmatched states.
+- [x] Posters with bounded cache, confirmed IMDb IDs/links, offline placeholders.
+- [x] Review/search/manual confirmation, local title edits, validated IMDb URL, explicit rematch.
+- [x] Lock manual matches; merge provider identities without losing histories or watched state; distinguish unrelated reassignment.
+- [x] TV season/episode lookup, multi-episode correction, specials and uncertain numbering.
+- [x] Deterministic mocked tests; optional live credential test documented separately.
 
 Exit evidence: AC-06–09, AC-23–24; local operation unaffected by provider failure.
 
@@ -117,7 +117,7 @@ Exit evidence: AC-09–10, AC-20–22, AC-25 components.
 - [x] Select and verify Caddy 2.11.7/PHP FastCGI on Windows/Linux; document versions and local runtime operations.
 - [ ] Update/verify supported PHP patch; check web/CLI extension parity.
 - [x] Production launch/shutdown with two queue consumers, ownership, and health.
-- [ ] Wire backend-start availability check when its phase 3 handler exists; current startup messages only verify queue infrastructure.
+- [x] Wire backend-start availability check after startup readiness; real restart smoke checks verify once-per-launch behavior.
 - [ ] Explicit LAN setting, allowed hosts/origins, login throttling, private-subnet firewall instructions; no public exposure.
 - [ ] Restricted secret/data ACLs, rotating redacted logs and retention controls.
 - [ ] Settings for probe concurrency, extensions/exclusions, page size, cache limits and diagnostics.

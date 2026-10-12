@@ -5,4 +5,5 @@
 /.phpunit.cache/
 /tools/composer.phar
 /tools/caddy/
+/tools/ffmpeg/
 /*.log

@@ -1,0 +1,5 @@
+{% extends 'base.html.twig' %}
+{% block body %}<p class="eyebrow">METADATA</p><h1>Review matches</h1><p><a href="{{ path('metadata_settings') }}">TMDB settings</a> · <a href="{{ path('library',{view:'unresolved'}) }}">Unresolved files</a></p>
+{% for row in rows %}<article class="panel"><a href="{{ path('match_edit',{type:row.type,id:row.id}) }}">{{ row.title }}</a><p>{{ row.type == 'movies' ? 'Movie' : 'TV series' }} · {{ row.matching_state|replace({'_':' '}) }}{{ row.manual_lock ? ' · Manual lock' : '' }}</p></article>{% else %}<p>No pending review titles.</p>{% endfor %}
+<div class="row">{% if page > 1 %}<a href="{{ path('match_review',{page:page-1}) }}">Previous</a>{% endif %}{% if rows|length == 50 %}<a href="{{ path('match_review',{page:page+1}) }}">Next</a>{% endif %}</div>
+<section class="panel"><h2>Recent metadata jobs</h2><p>Refresh this page to see completed results. Start the metadata worker with the normal launcher.</p>{% for run in runs %}<p><a href="{{ path('run_detail',{id:run.id}) }}">{{ run.queued_at }}</a> · {{ run.state|replace({'_':' '}) }} · {{ run.summary }}</p>{% else %}<p>No metadata jobs yet.</p>{% endfor %}</section>{% endblock %}

@@ -5,3 +5,5 @@ services:
     App\:
         resource: '../src/'
         exclude: '../src/{Kernel.php,Security/Owner.php,Message/}'
+
+    App\Metadata\Provider: '@App\Metadata\TmdbProvider'

@@ -13,6 +13,6 @@ final class HealthController
     {
         if (!in_array($request->getClientIp(), ['127.0.0.1','::1'], true)) { return new JsonResponse(['status'=>'forbidden'],403); }
         $db->fetchOne('SELECT COUNT(*) FROM worker_health');
-        return new JsonResponse(['status'=>'ok','php'=>PHP_VERSION,'sqlite'=>$db->fetchOne('SELECT sqlite_version()'), 'extensions'=>array_values(array_filter(['pdo_sqlite','mbstring','session','ctype','iconv'], 'extension_loaded'))]);
+        return new JsonResponse(['status'=>'ok','php'=>PHP_VERSION,'sqlite'=>$db->fetchOne('SELECT sqlite_version()'), 'extensions'=>array_values(array_filter(['pdo_sqlite','mbstring','session','ctype','iconv','openssl'], 'extension_loaded'))]);
     }
 }

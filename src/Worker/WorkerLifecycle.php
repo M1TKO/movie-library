@@ -28,11 +28,31 @@ final class WorkerLifecycle implements EventSubscriberInterface
         $this->name = $names[0];
         $this->lock = (new LockFactory(new FlockStore($_SERVER['APP_DATA_DIR'])))->createLock('worker-'.$this->name);
         if (!$this->lock->acquire()) { throw new \RuntimeException('A '.$this->name.' worker already owns this data directory.'); }
+        if ($this->name === 'filesystem') {
+            // Holding both locks proves no healthy consumer/handler owns these runs.
+            $jobs = (new LockFactory(new FlockStore($_SERVER['APP_DATA_DIR'])))->createLock('filesystem-job');
+            if (!$jobs->acquire()) { throw new \RuntimeException('A filesystem job still owns this data directory.'); }
+            try {
+                $this->db->executeStatement("UPDATE run_locations SET enumeration_outcome='interrupted', error_code='worker_interrupted', error_reason='Worker stopped before finishing; partial results were retained.' WHERE run_id IN (SELECT id FROM runs WHERE job_type IN ('discovery','availability') AND state='running') AND enumeration_outcome IN ('queued','running')");
+                $this->db->executeStatement("UPDATE runs SET state='interrupted', finished_at=?, summary='Worker interrupted. Partial results were retained; retry manually.' WHERE job_type IN ('discovery','availability') AND state='running'", [gmdate(DATE_ATOM)]);
+            } finally { $jobs->release(); }
+        }
+        if ($this->name === 'metadata') {
+            $jobs = (new LockFactory(new FlockStore($_SERVER['APP_DATA_DIR'])))->createLock('metadata-job');
+            if (!$jobs->acquire()) { throw new \RuntimeException('A metadata job still owns this data directory.'); }
+            try {
+                $this->db->executeStatement("UPDATE runs SET state='interrupted',finished_at=?,enrichment_pending=0,summary='Metadata worker interrupted. Saved catalog data was retained; retry from Review matches.' WHERE job_type='enrichment' AND state='running'",[gmdate(DATE_ATOM)]);
+            } finally { $jobs->release(); }
+        }
         $this->instance = getenv('APP_INSTANCE_ID') ?: bin2hex(random_bytes(16));
         $now = gmdate(DATE_ATOM);
         $this->db->executeStatement('INSERT INTO worker_health (name,instance_id,pid,state,started_at,heartbeat_at) VALUES (?,?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET instance_id=excluded.instance_id,pid=excluded.pid,state=excluded.state,started_at=excluded.started_at,heartbeat_at=excluded.heartbeat_at,last_error=NULL', [$this->name,$this->instance,getmypid(),'running',$now,$now]);
     }
     public function running(WorkerRunningEvent $event): void
+    {
+        $this->heartbeat();
+    }
+    public function heartbeat(): void
     {
         if (time() - $this->lastBeat >= 2) {
             $this->db->executeStatement('UPDATE worker_health SET heartbeat_at=? WHERE name=? AND instance_id=?', [gmdate(DATE_ATOM),$this->name,$this->instance]);

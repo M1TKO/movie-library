@@ -17,7 +17,7 @@ use Symfony\Component\Process\{Process, ExecutableFinder};
 #[AsCommand(name: 'app:serve', description: 'Supervise Caddy, PHP FastCGI, and both durable workers on localhost')]
 final class ServeCommand extends Command
 {
-    public function __construct(private readonly Connection $db, private readonly MessageBusInterface $bus) { parent::__construct(); }
+    public function __construct(private readonly Connection $db, private readonly MessageBusInterface $bus, private readonly \App\Availability\CheckDispatcher $checks) { parent::__construct(); }
     protected function configure(): void
     {
         $this->addOption('port', null, InputOption::VALUE_REQUIRED, 'Local HTTP port', '8080')
@@ -121,7 +121,8 @@ final class ServeCommand extends Command
                     $health = $body ? json_decode($body,true) : null;
                     $count = (int)$this->db->fetchOne('SELECT COUNT(*) FROM worker_receipts WHERE id IN (?,?)',$receipts);
                     if (($health['status'] ?? null) === 'ok' && $count === 2) {
-                        if ($health['php'] !== PHP_VERSION || count($health['extensions'] ?? []) !== 5) { throw new \RuntimeException('Web and CLI PHP runtimes/extensions differ.'); }
+                        if ($health['php'] !== PHP_VERSION || count($health['extensions'] ?? []) !== 6) { throw new \RuntimeException('Web and CLI PHP runtimes/extensions differ.'); }
+                        $this->checks->dispatch('backend_start');
                         $ready = true;
                         $output->writeln('Movie Library ready: http://127.0.0.1:'.$port.' (both workers verified)');
                         $output->writeln('Data: '.$data.' | Stop using the stop script or Ctrl+C.');

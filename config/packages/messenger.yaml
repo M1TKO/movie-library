@@ -13,3 +13,6 @@ framework:
             failed:
                 dsn: 'doctrine://default'
                 options: { queue_name: failed, auto_setup: false }
+
+        routing:
+            App\Message\Enrich: metadata
