@@ -2,7 +2,7 @@
 
 A personal movie and TV catalog for **Windows and Linux**, implemented in phases from [the project specification](Movie-Library-Specification.md). Both platforms are required release targets.
 
-**Phases 2, 3 and 4 are implemented; Phase 5 is underway.** Scan selected locations manually, browse movies/TV and unresolved copies, inspect files with FFprobe, manage or relocate roots while retaining history, and check known-path availability in the background. Discovery reconciles absence only from successful directory evidence across all enabled memberships. Paginated run/title/file history and background job progress are available. Library browsing includes combined filters, stable sorting/pagination, table/poster layouts, distinct physical storage totals and copy-path controls. TMDB enrichment, correction, cached posters and confirmed IMDb links are available. Watched actions, richer TV navigation, optional playback and release features remain later work. See [IMPLEMENTATION.md](IMPLEMENTATION.md), [validation results](docs/VALIDATION.md) and [TMDB setup](docs/TMDB.md). Updated Linux validation is pending because Docker's daemon is stopped.
+**Phases 2–5 are implemented.** Manually scan selected locations, browse and filter movies/TV and unresolved copies, inspect files with FFprobe, manage or relocate roots, check availability, and review TMDB metadata. TV navigation includes specials, seasons, episodes and every copy; watched changes retain timestamps/history and offer catalog-only bulk previews. Whole-library and filtered totals deduplicate physical storage. Copy paths from detail pages; optional authenticated folder/play actions run on an explicitly configured host desktop. Phase 6 release features are next. See [IMPLEMENTATION.md](IMPLEMENTATION.md), [validation results](docs/VALIDATION.md) and [TMDB setup](docs/TMDB.md). Current Linux validation remains pending because Docker is stopped.
 
 ## Normal application startup
 
@@ -100,6 +100,7 @@ composer test
 $env:APP_DATA_DIR = 'D:\MovieLibrary\var\dev'
 composer check
 composer validate --strict
+node --test tests/LibraryUiTest.cjs
 ```
 
 Tests use synthetic paths and a separate SQLite database. They do not scan, change, or remove media. `composer check` validates dependency injection and Twig templates. Detailed acceptance coverage and manual limitations are in `docs/VALIDATION.md`.
@@ -115,3 +116,9 @@ Relocation is available from Edit location. Preview the new root and relative pa
 Discovery marks unseen files missing only when successful directory listings establish absence across every enabled membership. Failed or unscanned areas preserve last-known availability. File/title event history and run/file outcomes are paginated in groups of 50. Copy path reports clipboard success or selects the path for manual copying when clipboard access fails. Linux revalidation, real external/network storage, ACL failures and large-library performance are explicitly unverified.
 
 For continuation, use the **Next task** in [IMPLEMENTATION.md](IMPLEMENTATION.md) and record evidence in [docs/VALIDATION.md](docs/VALIDATION.md).
+
+## Watched state and host actions
+
+Use a movie or episode's watched link to preview and confirm a change. Series and season actions show the number of cataloged episodes they affect, including missing copies. Newly discovered episodes start unwatched. If the catalog or watched state changes after preview, confirmation returns a conflict and a refreshed preview. Playback leaves watched state unchanged.
+
+Host actions are off by default. Run the backend under your logged-in desktop account, set `MOVIE_LIBRARY_INTERACTIVE_DESKTOP=1` in that launcher's environment, restart it, then enable host actions in Settings. Windows also requires a non-service `SESSIONNAME`; Linux requires `DISPLAY` or `WAYLAND_DISPLAY`, `xdg-open`, and a default media-player association. Keep this variable unset for services, headless hosts and containers. The setting cannot enable actions without the desktop configuration. Each request uses a catalog file ID, requires authentication and CSRF, checks the latest available outcome, and launches a fixed platform command with a five-second timeout. Failures are shown on the file page; Copy path stays available.

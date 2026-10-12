@@ -59,12 +59,28 @@ final class LibraryQuery
         $total=(int)$this->db->fetchOne('SELECT COUNT(*) FROM ('.$filtered.') result', $params);
         $page=max(1,min($request->query->getInt('page',1),max(1,(int)ceil($total/$perPage))));
         $rows=$this->db->fetchAllAssociative($filtered.' ORDER BY '.$orders[$sort].' '.strtoupper($direction).', '.($titleView?'t':'f').'.id '.strtoupper($direction).' LIMIT '.$perPage.' OFFSET '.(($page-1)*$perPage),$params);
-        foreach ($rows as &$row) { $row['poster_key']=$titleView ? \App\Metadata\TmdbProvider::posterKey($row['poster_path']) : null; } unset($row);
+        foreach ($rows as &$row) {
+            $row['poster_key']=$titleView ? \App\Metadata\TmdbProvider::posterKey($row['poster_path']) : null;
+            if ($view==='movies') { $row['watched_summary']=$row['watched']?'Watched':'Unwatched'; }
+            elseif ($view==='series') {
+                $counts=$this->db->fetchAssociative('SELECT COUNT(*) total,COALESCE(SUM(e.watched),0) watched FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id=? AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)',[$row['id']]);
+                $row['watched_summary']=!$counts['watched']?'Unwatched':($counts['total']===$counts['watched']?'Watched':'Partially watched');
+            }
+        } unset($row);
         if ($titleView) {
             $links=$view==='movies' ? 'SELECT l.file_id FROM file_content_links l WHERE l.movie_id IN (SELECT id FROM selected)' : 'SELECT l.file_id FROM file_content_links l JOIN episodes e ON e.id=l.episode_id JOIN seasons s ON s.id=e.season_id WHERE s.series_id IN (SELECT id FROM selected)';
             $physical='WITH selected AS ('.$filtered.') SELECT f.* FROM media_files f WHERE f.id IN ('.$links.')';
         } else { $physical=$filtered; }
         $totals=$this->db->fetchAssociative("SELECT COUNT(*) files, COALESCE(SUM(CASE WHEN check_outcome='available' THEN 1 ELSE 0 END),0) available, COALESCE(SUM(CASE WHEN check_outcome='missing' THEN 1 ELSE 0 END),0) missing, COALESCE(SUM(CASE WHEN check_outcome NOT IN ('available','missing') THEN 1 ELSE 0 END),0) uncheckable, COALESCE(SUM(size_bytes),0) bytes, COALESCE(SUM(CASE WHEN check_outcome='available' THEN size_bytes ELSE 0 END),0) available_bytes FROM (".$physical.') physical',$params);
-        return compact('rows','total','page','view','layout','sort','direction','availability','matching','watched','resolution','q','location','perPage','totals') + ['filters'=>['view'=>$view,'layout'=>$layout,'sort'=>$sort,'direction'=>$direction,'availability'=>$availability,'matching'=>$matching,'watched'=>$watched,'resolution'=>$resolution,'q'=>$q,'location'=>$location,'per_page'=>$perPage], 'locations'=>$this->db->fetchAllAssociative('SELECT id,label FROM locations ORDER BY label,id')];
+        if ($titleView && $view==='movies') {
+            $watchedSql='WITH selected AS ('.$filtered.') SELECT watched FROM selected';
+        } elseif ($titleView) {
+            $watchedSql='WITH selected AS ('.$filtered.') SELECT e.watched FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id IN (SELECT id FROM selected) AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)';
+        } else {
+            $watchedSql='WITH selected AS ('.$filtered.') SELECT m.watched FROM movies m WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.movie_id=m.id AND l.file_id IN (SELECT id FROM selected)) UNION ALL SELECT e.watched FROM episodes e WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id AND l.file_id IN (SELECT id FROM selected))';
+        }
+        $watchedTotals=$this->db->fetchAssociative('SELECT COUNT(*) titles,COALESCE(SUM(watched),0) watched,COALESCE(SUM(watched=0),0) unwatched FROM ('.$watchedSql.') content',$params);
+        $seriesStates=$view==='series'?(new Experience($this->db))->seriesStates($filtered,$params):null;
+        return compact('rows','total','page','view','layout','sort','direction','availability','matching','watched','resolution','q','location','perPage','totals','watchedTotals','seriesStates') + ['filters'=>['view'=>$view,'layout'=>$layout,'sort'=>$sort,'direction'=>$direction,'availability'=>$availability,'matching'=>$matching,'watched'=>$watched,'resolution'=>$resolution,'q'=>$q,'location'=>$location,'per_page'=>$perPage], 'locations'=>$this->db->fetchAllAssociative('SELECT id,label FROM locations ORDER BY label,id')];
     }
 }

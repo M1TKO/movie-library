@@ -12,6 +12,7 @@ use Symfony\Component\Process\Process;
 
 final class LibraryController extends AbstractController
 {
+    public function __construct(private readonly \App\Catalog\Experience $experience, private readonly \App\Host\HostActions $host) {}
     #[Route('/', name: 'library', methods: ['GET'])]
     public function index(Connection $db, Request $request, \App\Availability\CheckDispatcher $checks, \App\Catalog\LibraryQuery $library): Response
     {
@@ -23,6 +24,9 @@ final class LibraryController extends AbstractController
         foreach (['movies','series','episodes','media_files'] as $table) { $stats[$table] = (int)$db->fetchOne('SELECT COUNT(*) FROM '.$table); }
         $stats['episodes'] = (int)$db->fetchOne('SELECT COUNT(*) FROM episodes e WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)');
         $stats['unresolved'] = (int)$db->fetchOne('SELECT COUNT(*) FROM media_files f WHERE NOT EXISTS(SELECT 1 FROM file_content_links l WHERE l.file_id=f.id)');
+        $stats['availability'] = $this->experience->totals();
+        $stats['watched'] = $this->experience->watchedTotals();
+        $stats['series_states'] = $this->experience->seriesStates();
         $stats['available_bytes'] = (int)$db->fetchOne("SELECT COALESCE(SUM(size_bytes),0) FROM media_files WHERE check_outcome='available'");
         return $this->render('library/index.html.twig', $library->browse($request) + ['stats'=>$stats,'availabilityRun'=>$db->fetchAssociative("SELECT * FROM runs WHERE job_type='availability' ORDER BY queued_at DESC,id DESC LIMIT 1")]);
     }
@@ -31,8 +35,8 @@ final class LibraryController extends AbstractController
     {
         $file = $db->fetchAssociative('SELECT * FROM media_files WHERE id=?', [$id]);
         if (!$file) { throw $this->createNotFoundException(); }
-        return $this->render('library/file.html.twig', $history->page('file', $id, $request->query->getInt('history_page', 1)) + ['file'=>$file,
-            'links'=>$db->fetchAllAssociative('SELECT m.id movie_id,m.title movie_title,s.id series_id,s.title series_title,se.season_number,e.episode_number FROM file_content_links l LEFT JOIN movies m ON m.id=l.movie_id LEFT JOIN episodes e ON e.id=l.episode_id LEFT JOIN seasons se ON se.id=e.season_id LEFT JOIN series s ON s.id=se.series_id WHERE l.file_id=?', [$id]),
+        return $this->render('library/file.html.twig', $history->page('file', $id, $request->query->getInt('history_page', 1)) + ['file'=>$file,'hostEnabled'=>$this->host->enabled(),
+            'links'=>$db->fetchAllAssociative('SELECT m.id movie_id,m.title movie_title,s.id series_id,s.title series_title,se.id season_id,e.id episode_id,se.season_number,e.episode_number FROM file_content_links l LEFT JOIN movies m ON m.id=l.movie_id LEFT JOIN episodes e ON e.id=l.episode_id LEFT JOIN seasons se ON se.id=e.season_id LEFT JOIN series s ON s.id=se.series_id WHERE l.file_id=?', [$id]),
             'locations'=>$db->fetchAllAssociative('SELECT l.label,l.enabled,fl.in_scope FROM file_locations fl JOIN locations l ON l.id=fl.location_id WHERE fl.file_id=?', [$id])]);
     }
     #[Route('/catalog/{type}/{id}', name: 'title_detail', requirements: ['type'=>'movies|series','id'=>'\d+'], methods: ['GET'])]
@@ -45,13 +49,16 @@ final class LibraryController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $page = max(1, min(1000000, $request->query->getInt('page', 1)));
+        $experience=$this->experience;
+        $physical=$type==='movies' ? 'SELECT f.* FROM media_files f WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.file_id=f.id AND l.movie_id=?)' : 'SELECT f.* FROM media_files f WHERE EXISTS(SELECT 1 FROM file_content_links l JOIN episodes e ON e.id=l.episode_id JOIN seasons s ON s.id=e.season_id WHERE l.file_id=f.id AND s.series_id=?)';
+        $totals=$experience->totals($physical,[$id]);
+        $page = max(1, min($request->query->getInt('page',1),max(1,(int)ceil($totals['files']/50))));
         $sql = $type === 'movies'
             ? 'SELECT f.*,NULL season_number,NULL episode_number,NULL episode_title,NULL episode_imdb FROM media_files f JOIN file_content_links l ON l.file_id=f.id WHERE l.movie_id=? ORDER BY f.id'
             : 'SELECT f.*,s.season_number,e.episode_number,e.title episode_title,e.imdb_id episode_imdb FROM episodes e JOIN seasons s ON s.id=e.season_id JOIN file_content_links l ON l.episode_id=e.id JOIN media_files f ON f.id=l.file_id WHERE s.series_id=? ORDER BY s.season_number,e.episode_number,f.id';
         $files = $db->fetchAllAssociative($sql.' LIMIT 50 OFFSET ?', [$id,($page-1)*50], [\PDO::PARAM_INT,\PDO::PARAM_INT]);
         return $this->render('library/title.html.twig', $history->page($type, $id, $request->query->getInt('history_page', 1)) + ['title'=>$title,'type'=>$type,'files'=>$files,'page'=>$page,'poster'=>\App\Metadata\TmdbProvider::posterKey($title['poster_path']),
-            'genres'=>json_decode($title['genres'],true)]);
+            'totals'=>$totals,'seasons'=>$type==='series'?$experience->seasons($id):[],'hostEnabled'=>$this->host->enabled(),'genres'=>json_decode($title['genres'],true)]);
     }
     #[Route('/settings', name: 'settings', methods: ['GET','POST'])]
     public function settings(Connection $db, Request $request): Response
@@ -63,7 +70,10 @@ final class LibraryController extends AbstractController
                 $extensions = ScanOptions::extensions($request->request->getString('extensions'));
                 $probe = trim($request->request->getString('ffprobe'));
                 if ($probe === '' || strlen($probe) > 4096 || str_contains($probe, "\0")) { throw new \InvalidArgumentException('Enter an executable name or an absolute FFprobe executable path.'); }
-                $db->transactional(function () use ($db, $extensions, $probe): void {
+                $host=$this->host;
+                $enabled=$request->request->getBoolean('host_actions') && $host->desktop();
+                $db->transactional(function () use ($db, $extensions, $probe, $enabled): void {
+                    $db->update('settings',['value'=>$enabled?'true':'false'],['name'=>'host_actions_enabled']);
                     $db->update('settings', ['value'=>implode(' ', $extensions)], ['name'=>'video_extensions']);
                     $db->update('settings', ['value'=>$probe], ['name'=>'ffprobe_executable']);
                 });
@@ -84,6 +94,6 @@ final class LibraryController extends AbstractController
             $workers[] = ['name'=>$name,'status'=>$row && $row['state']==='running' && strtotime($row['heartbeat_at']) >= time()-15 ? 'Running' : 'Stopped or not responding', 'heartbeat'=>$row['heartbeat_at'] ?? 'Never', 'error'=>$row['last_error'] ?? null];
         }
         return $this->render('library/settings.html.twig',['workers'=>$workers,'error'=>$error,'probeVersion'=>$probeVersion,
-            'extensions'=>$db->fetchOne("SELECT value FROM settings WHERE name='video_extensions'"),'ffprobe'=>$db->fetchOne("SELECT value FROM settings WHERE name='ffprobe_executable'")]);
+            'hostDesktop'=>$this->host->desktop(),'hostEnabled'=>$db->fetchOne("SELECT value FROM settings WHERE name='host_actions_enabled'")==='true','extensions'=>$db->fetchOne("SELECT value FROM settings WHERE name='video_extensions'"),'ffprobe'=>$db->fetchOne("SELECT value FROM settings WHERE name='ffprobe_executable'")]);
     }
 }

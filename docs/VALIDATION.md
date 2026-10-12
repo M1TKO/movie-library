@@ -1,18 +1,20 @@
 # Latest validation — 12 October 2026
 
-Phase 3 implementation complete; Phase 5 library browsing and copy-path implementation started. Cross-platform and real-storage acceptance is still pending.
+Phases 2–5 implementation complete. Cross-platform and real-storage acceptance is still pending.
 
-- Full Windows PHPUnit: **94 tests, 458 assertions passed, no skips**, in **48.378 seconds**, PHP 8.2.0, with project-local FFmpeg/FFprobe 9.0.2 enabled. Test data stays in `var/test`; all media and unavailable-path fixtures are synthetic.
-- Container lint, all **20 Twig templates**, Composer strict validation and `node --check public/app.js` pass. Clear the test cache when editing templates because the test kernel runs without debug auto-reloading.
-- Discovery reconciliation requires completed directory listings and absence evidence from every enabled membership. Tests cover missing/restored transitions without repeated events, an unscanned overlapping root, a failed subtree beside a successfully listed sibling, and cancellation during reconciliation retaining exactly the committed results.
-- Two concurrent PHP processes coalesce availability dispatch into one durable run. Active availability cancellation retains a completed root's unchanged outcome, and restart recovery retains committed missing transitions while marking the unfinished run Interrupted. Timeout and incomplete work retain last-known availability. Result processing keeps run/worker heartbeats alive.
-- Run lists and file outcomes, plus title/file event history, paginate with stable ordering. Event-history tests traverse 55 events without duplication; run pages clamp to the available range. Global background-job status and root progress are rendered in authenticated views.
-- Phase 5 tests cover combined search/watched/availability/location/resolution filters, escaped wildcard searches, whitelisted sorting, stable page boundaries, table/poster controls and empty results. Copy filters must match the same physical copy. Filtered physical-file totals deduplicate multi-episode links and expose available/missing/uncheckable counts and last-known/available storage.
-- File/title detail pages provide Copy path with success status and selectable-text fallback. BrowserKit verifies the file control and path rendering; JavaScript syntax passes. Actual browser clipboard permission/fallback behavior, keyboard and narrow-screen visual checks remain unverified.
+- Full Windows PHPUnit: **100 tests, 530 assertions passed, no skips**, in **48.696 seconds**, PHP 8.2.0, with project-local FFmpeg/FFprobe 9.0.2. Tests use isolated `var/test` data and synthetic media.
+- Container lint, all **26 Twig templates**, Composer strict validation and JavaScript syntax pass. **3 Node tests pass** for clipboard success, denied-clipboard selectable-text fallback, and polling loading/failure/recovery.
+- Phase 5 checks cover TV specials/season/episode navigation, missing copies, catalog-only bulk actions, watched timestamps/audit events, idempotence, persistence across kernel/database reconnections, and atomic rejection when watched state or linked episode scope changes after preview.
+- Whole-library/filtered watched and derived series-state totals exclude provider-only episodes. Physical storage counts each multi-episode file once. Existing combined-filter, stable sorting/pagination, metadata, discovery and availability regressions pass.
+- Host-action checks cover default/headless disablement, authentication/CSRF, rejecting missing/unknown file IDs and arbitrary actions, and literal catalog-path handling including quotes, spaces and shell metacharacters. Command preparation is tested without launching owner applications. Actual Windows/Linux desktop player and folder launches remain unverified.
+- Isolated real-browser validation at `127.0.0.1:8015` used only a synthetic catalog in `var/phase5-browser`: sign-in, series/specials/episode navigation, watched/unwatched confirmation and series bulk preview/confirmation, history, keyboard activation, Copy path success with matching clipboard text, and empty filtering passed.
+- Library and episode layouts were checked at a 390-pixel viewport without document horizontal overflow. Stopping/restarting only the validation HTTP server showed the polling connection failure message, retained the rendered catalog, and automatically recovered. Viewport overrides were reset and the validation server stopped.
+- Browser testing found and fixed the development router's missing `app.js` allowlist entry, which had blocked clipboard JavaScript and could capture an asset URL as the post-login redirect. Invalid legacy middle-dot encoding in progress/history templates was repaired.
+- Denied-clipboard fallback has deterministic JavaScript coverage; actual denied-permission browser behavior, additional browsers and Linux desktop UI remain unverified.
 
-**Remaining acceptance:** Linux execution is blocked by the stopped Docker daemon (confirmed using `docker info` outside the sandbox). Real ACL denial, disconnected drives, hanging network shares and 10,000-file performance require further environment validation. Historical Phase 1 Linux results below do not validate current code. No owner media, live TMDB credential, host playback, LAN or backup/restore was exercised.
+**Remaining acceptance:** Linux execution is blocked by the stopped Docker daemon. Real ACL denial, disconnected drives, hanging shares, 10,000-file performance, actual host playback/folder launching, LAN and backup/restore still require validation. No owner media, live TMDB credentials or owner catalog were used.
 
-**Next implementation:** Phase 5 season/episode navigation and availability breakdowns, persistent watched actions with catalog-only bulk previews, complete whole-library watched totals and explicitly enabled optional host actions. See [the implementation tracker](../IMPLEMENTATION.md).
+**Next implementation:** Phase 6 consistent SQLite backup and safe restore, then the remaining release checklist in [IMPLEMENTATION.md](../IMPLEMENTATION.md).
 
 ## Previous validation � 12 October 2026
 

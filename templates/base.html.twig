@@ -8,6 +8,6 @@
 <header><a class="brand" href="{{ path('library') }}"><span class="mark">ML</span> Movie Library</a><span class="badge">LOCAL CATALOG</span>
 {% if app.user %}<form method="post" action="{{ path('logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}"><button class="subtle">Sign out</button></form>{% endif %}</header>
 {% if app.user %}<nav aria-label="Main navigation"><a href="{{ path('library') }}">Library</a><a href="{{ path('locations') }}">Locations</a><a href="{{ path('runs') }}">Scan history</a><a href="{{ path('match_review') }}">Review matches</a><a href="{{ path('settings') }}">Settings</a></nav>{% endif %}
-<main>{% if app.user %}{{ render(path('job_status')) }}{% endif %}{% for type, messages in app.flashes %}{% for message in messages %}<p class="notice {{ type }}" role="status">{{ message }}</p>{% endfor %}{% endfor %}
+<main><p id="request-status" aria-live="polite" hidden></p>{% if app.user %}{{ render(path('job_status')) }}{% endif %}{% for type, messages in app.flashes %}{% for message in messages %}<p class="notice {{ type }}" role="status">{{ message }}</p>{% endfor %}{% endfor %}
 {% block body %}{% endblock %}</main><footer>Your collection, on your computer. Media files are never modified.</footer>
 </body></html>

@@ -16,9 +16,9 @@ This file tracks implementation, not just planning. `[x]` means implemented and 
 
 ## Current position
 
-**Phases 2, 3 and 4 implementation are complete; Phase 5 has started.** Phase 3 now includes successful-directory discovery reconciliation, paginated run/file/title history, global job status, cooperative cancellation, result-processing heartbeats and durable partial results. Automated Windows fixtures cover missing/restored transitions, failed subtrees, overlap, concurrent dispatch, cancellation and interruption. Cross-platform acceptance remains pending; real ACL denial, offline drives, hanging shares and large-library performance have not been verified.
+**Phases 2–5 implementation are complete.** Phase 3 now includes successful-directory discovery reconciliation, paginated run/file/title history, global job status, cooperative cancellation, result-processing heartbeats and durable partial results. Automated Windows fixtures cover missing/restored transitions, failed subtrees, overlap, concurrent dispatch, cancellation and interruption. Cross-platform acceptance remains pending; real ACL denial, offline drives, hanging shares and large-library performance have not been verified.
 
-**Next task: continue Phase 5 TV navigation and watched actions.** Combined library filters, safe sorting, stable pagination, poster/table layouts, distinct filtered physical-file/storage totals, availability counts and copy-path controls are implemented. Complete season/episode navigation and availability breakdowns, watched/unwatched actions with bulk preview, whole-library watched totals and optional host actions. BrowserKit checks cover rendered controls; real-browser clipboard, keyboard and narrow-screen validation remains pending. Use synthetic fixtures; never scan arbitrary owner drives.
+**Next task: Phase 6 backup and restore.** Phase 5 now includes series/season/episode navigation, distinct availability/storage breakdowns, watched timestamps and audit history, catalog-only bulk previews with stale-scope rejection, whole-library/filtered watched totals, and opt-in desktop host actions. Windows automated checks and an isolated real-browser workflow pass. Linux execution, actual host player/folder launches, real-storage failures and broad browser coverage remain acceptance work. Use synthetic fixtures; never scan arbitrary owner drives.
 
 ## Phase 1 — Foundation
 
@@ -102,12 +102,12 @@ Exit evidence: AC-06–09, AC-23–24; local operation unaffected by provider fa
 ## Phase 5 — Library experience
 
 - [x] Poster/table views, combined search/filters, safe sorting and stable pagination; preserve filters across layout/view/page changes.
-- [ ] Movie/series/season/episode navigation with all copies and availability breakdown.
-- [ ] Watched/unwatched persistence; season/series bulk preview and catalog-only scope.
-- [ ] Complete whole-library and filtered totals. Distinct filtered physical-file/storage totals and availability counts are implemented; whole-library watched summaries remain.
-- [x] Copy path with selectable-text fallback and success/failure status on file/title detail pages; real-browser clipboard validation remains pending.
-- [ ] Explicitly enabled, authenticated host actions for cataloged available files only; disable without interactive desktop.
-- [ ] Keyboard, narrow-screen, loading, failure/retry, and empty-state browser validation.
+- [x] Movie/series/season/episode navigation with paginated copies and distinct availability/storage breakdowns, including specials and multi-episode links.
+- [x] Watched/unwatched persistence, watched timestamps and audit history; season/series bulk preview, catalog-only scope and stale-preview rejection under a transaction.
+- [x] Complete whole-library and filtered physical-file/storage, watched movie/episode and derived series-state totals. Multi-episode files count once in storage.
+- [x] Copy path with selectable-text fallback and success/failure status on file/movie/episode pages; real-browser keyboard copy succeeds, denied-clipboard fallback has automated JavaScript coverage.
+- [x] Opt-in, authenticated and CSRF-protected host actions for cataloged available files only, bounded platform launch commands and failure messages; disable without an explicitly configured interactive desktop. Actual player/folder launches remain acceptance checks.
+- [x] Isolated real-browser validation of keyboard copy/navigation/forms, 390-pixel library/episode layouts, bulk confirmation, empty filtering and failed polling with automatic recovery. Broader browser/platform acceptance remains.
 
 Exit evidence: AC-09–10, AC-20–22, AC-25 components.
 

@@ -9,6 +9,7 @@ final class History
     {
         $where = match ($type) {
             'file' => 'ev.file_id=:id',
+            'episodes' => 'ev.episode_id=:id OR EXISTS (SELECT 1 FROM file_content_links l WHERE l.file_id=ev.file_id AND l.episode_id=:id)',
             'movies' => 'ev.movie_id=:id OR EXISTS (SELECT 1 FROM file_content_links l WHERE l.file_id=ev.file_id AND l.movie_id=:id)',
             'series' => 'ev.series_id=:id OR EXISTS (SELECT 1 FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id=:id AND (e.id=ev.episode_id OR EXISTS (SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id AND l.file_id=ev.file_id)))',
             default => throw new \InvalidArgumentException('Invalid history target.'),
