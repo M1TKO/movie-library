@@ -16,9 +16,9 @@ This file tracks implementation, not just planning. `[x]` means implemented and 
 
 ## Current position
 
-**Phase 2 and Phase 4 implementation are complete; Phase 3 acceptance remains in progress.** Durable manual discovery, bounded read-only traversal/probing, local movie/TV parsing, unresolved-file browsing, overlapping memberships, catalog-preserving location management and explicit relocation are implemented. Windows automated validation includes real FFprobe and supervised startup; the updated Linux harness awaits a running Docker daemon. Do not claim complete cross-platform acceptance until that run passes.
+**Phases 2, 3 and 4 implementation are complete; Phase 5 has started.** Phase 3 now includes successful-directory discovery reconciliation, paginated run/file/title history, global job status, cooperative cancellation, result-processing heartbeats and durable partial results. Automated Windows fixtures cover missing/restored transitions, failed subtrees, overlap, concurrent dispatch, cancellation and interruption. Cross-platform acceptance remains pending; real ACL denial, offline drives, hanging shares and large-library performance have not been verified.
 
-**Next task: finish Phase 3 availability/history acceptance, then Phase 5 library experience.** Known-path checks, launch/session triggers, debounce/coalescing, retained last-known state, missing/restored events, root-level durable partial results, cancellation, restart recovery, manual retry and run/file-history views are implemented. Remaining work: successful-area discovery reconciliation, paginated title/file event history, richer progress/global job indicators, concurrent-dispatch and active-check cancellation evidence, real ACL/offline-share tests, and Linux validation. Use synthetic fixtures; never scan arbitrary owner drives.
+**Next task: continue Phase 5 TV navigation and watched actions.** Combined library filters, safe sorting, stable pagination, poster/table layouts, distinct filtered physical-file/storage totals, availability counts and copy-path controls are implemented. Complete season/episode navigation and availability breakdowns, watched/unwatched actions with bulk preview, whole-library watched totals and optional host actions. BrowserKit checks cover rendered controls; real-browser clipboard, keyboard and narrow-screen validation remains pending. Use synthetic fixtures; never scan arbitrary owner drives.
 
 ## Phase 1 — Foundation
 
@@ -77,11 +77,12 @@ Exit evidence: offline manual discovery through the browser; AC-03–07, AC-10�
 - [x] Check only known paths; never recursively discover or re-probe during availability checks.
 - [x] Separate last-known state from latest outcome; missing/offline/access-denied/failed/not-monitored/unknown reasons.
 - [x] Respect overlapping enabled roots and changed scan scope.
-- [ ] Reconcile only successful areas; distinguish root failures from per-file outcomes.
+- [x] Reconcile only successfully listed areas; distinguish root failures from per-file outcomes. Unscanned overlaps, failed subtrees, changed scope and incomplete/cancelled scans cannot establish absence.
 - [x] Preserve last-seen and restoration transitions; do not repeat missing events for unchanged files.
-- [ ] Cooperative cancellation, interruption recovery, durable partial results, retry.
-- [ ] Paginated run list, progress, summaries, every-file outcomes (including unchanged), title/file event history.
-- [ ] Validate ACL denial, offline drive, hanging share, cancellation, concurrent dispatch and worker restart.
+- [x] Cooperative cancellation, interruption recovery, durable partial results, retry; keep worker/run heartbeats alive during result processing.
+- [x] Paginated run list, progress, summaries, every-file outcomes (including unchanged), title/file event history and global background-job indicator.
+- [x] Automated synthetic offline/timeout, cancellation, concurrent dispatch and worker-restart validation.
+- [ ] Real ACL denial, offline-drive/hanging-share validation and updated Linux execution; these are acceptance checks, not remaining implementation.
 
 Exit evidence: AC-12–19; no false missing transitions under errors or incomplete work.
 
@@ -100,11 +101,11 @@ Exit evidence: AC-06–09, AC-23–24; local operation unaffected by provider fa
 
 ## Phase 5 — Library experience
 
-- [ ] Poster/table views, combined search/filters, safe sorting and stable pagination.
+- [x] Poster/table views, combined search/filters, safe sorting and stable pagination; preserve filters across layout/view/page changes.
 - [ ] Movie/series/season/episode navigation with all copies and availability breakdown.
 - [ ] Watched/unwatched persistence; season/series bulk preview and catalog-only scope.
-- [ ] Whole-library and filtered totals; count titles and physical storage correctly.
-- [ ] Copy path with selectable-text fallback and success status.
+- [ ] Complete whole-library and filtered totals. Distinct filtered physical-file/storage totals and availability counts are implemented; whole-library watched summaries remain.
+- [x] Copy path with selectable-text fallback and success/failure status on file/title detail pages; real-browser clipboard validation remains pending.
 - [ ] Explicitly enabled, authenticated host actions for cataloged available files only; disable without interactive desktop.
 - [ ] Keyboard, narrow-screen, loading, failure/retry, and empty-state browser validation.
 

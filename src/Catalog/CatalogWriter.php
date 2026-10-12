@@ -40,7 +40,7 @@ final class CatalogWriter
                 if ($outcome !== 'unchanged') {
                     $this->db->insert('events', ['occurred_at'=>$now,'event_type'=>$outcome,'run_id'=>$runId,'file_id'=>$fileId,'path_snapshot'=>$record['path'],
                         'before_values'=>$existing ? json_encode(['size_bytes'=>$existing['size_bytes'],'modified_at'=>$existing['modified_at'],'availability'=>$existing['last_known_availability']], JSON_THROW_ON_ERROR) : null,
-                        'after_values'=>json_encode(['size_bytes'=>$record['size'],'modified_at'=>$record['mtime'],'availability'=>'available'], JSON_THROW_ON_ERROR)]);
+                        'after_values'=>json_encode(['size_bytes'=>$record['size'],'modified_at'=>$record['mtime'],'availability'=>'available'], JSON_THROW_ON_ERROR)] + FileEventContext::snapshot($this->db, $fileId));
                 }
             }
         });

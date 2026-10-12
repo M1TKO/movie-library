@@ -1,6 +1,22 @@
-# Latest validation � 12 October 2026
+# Latest validation — 12 October 2026
 
-Phase 4 implementation complete, with Windows deterministic validation. Phase 3 outstanding acceptance items remain unchanged. No live TMDB credential or owner media was used.
+Phase 3 implementation complete; Phase 5 library browsing and copy-path implementation started. Cross-platform and real-storage acceptance is still pending.
+
+- Full Windows PHPUnit: **94 tests, 458 assertions passed, no skips**, in **48.378 seconds**, PHP 8.2.0, with project-local FFmpeg/FFprobe 9.0.2 enabled. Test data stays in `var/test`; all media and unavailable-path fixtures are synthetic.
+- Container lint, all **20 Twig templates**, Composer strict validation and `node --check public/app.js` pass. Clear the test cache when editing templates because the test kernel runs without debug auto-reloading.
+- Discovery reconciliation requires completed directory listings and absence evidence from every enabled membership. Tests cover missing/restored transitions without repeated events, an unscanned overlapping root, a failed subtree beside a successfully listed sibling, and cancellation during reconciliation retaining exactly the committed results.
+- Two concurrent PHP processes coalesce availability dispatch into one durable run. Active availability cancellation retains a completed root's unchanged outcome, and restart recovery retains committed missing transitions while marking the unfinished run Interrupted. Timeout and incomplete work retain last-known availability. Result processing keeps run/worker heartbeats alive.
+- Run lists and file outcomes, plus title/file event history, paginate with stable ordering. Event-history tests traverse 55 events without duplication; run pages clamp to the available range. Global background-job status and root progress are rendered in authenticated views.
+- Phase 5 tests cover combined search/watched/availability/location/resolution filters, escaped wildcard searches, whitelisted sorting, stable page boundaries, table/poster controls and empty results. Copy filters must match the same physical copy. Filtered physical-file totals deduplicate multi-episode links and expose available/missing/uncheckable counts and last-known/available storage.
+- File/title detail pages provide Copy path with success status and selectable-text fallback. BrowserKit verifies the file control and path rendering; JavaScript syntax passes. Actual browser clipboard permission/fallback behavior, keyboard and narrow-screen visual checks remain unverified.
+
+**Remaining acceptance:** Linux execution is blocked by the stopped Docker daemon (confirmed using `docker info` outside the sandbox). Real ACL denial, disconnected drives, hanging network shares and 10,000-file performance require further environment validation. Historical Phase 1 Linux results below do not validate current code. No owner media, live TMDB credential, host playback, LAN or backup/restore was exercised.
+
+**Next implementation:** Phase 5 season/episode navigation and availability breakdowns, persistent watched actions with catalog-only bulk previews, complete whole-library watched totals and explicitly enabled optional host actions. See [the implementation tracker](../IMPLEMENTATION.md).
+
+## Previous validation � 12 October 2026
+
+Historical Phase 4 checkpoint, with Windows deterministic validation. The Phase 3 outstanding items described here are superseded by the latest results above. No live TMDB credential or owner media was used.
 
 - Full Windows PHPUnit: **84 tests, 393 assertions passed, no skips**, with project-local FFmpeg/FFprobe 9.0.2. Focused Phase 4 rerun after the final dispatch-coalescing fix: **17 tests, 128 assertions passed**.
 - Composer strict validation, container lint and all **17 Twig templates** pass. Fresh migration of all four versions succeeds, including metadata aliases/redirects and series audit references.
@@ -26,7 +42,7 @@ Phase 4 implementation complete, with Windows deterministic validation. Phase 3 
 
 The first sandboxed Windows production smoke attempt could not terminate owned children. Its isolated supervisor/process tree was verified and cleaned up with elevated process access; the subsequent full smoke run passed. This was an execution-sandbox limitation, not a metadata failure.
 
-# Latest validation — 12 October 2026
+## Previous validation — 12 October 2026
 
 Phase 2 implementation complete; Phase 3 implementation started. Windows PHP 8.2.0 / SQLite 3.39.2. Historical Phase 1 Linux results below do not validate the new Phase 2/3 code.
 
@@ -38,7 +54,7 @@ Phase 2 implementation complete; Phase 3 implementation started. Windows PHP 8.2
 - Phase 3 evidence: known-path checks do not add newly appearing files or re-probe existing copies; missing/restored transitions retain last-seen state and avoid repeated missing events; offline roots and no-longer-monitored copies retain last-known availability. Durable consumption, queued cancellation, restart interruption, timeout, session debounce, equivalent scan coalescing, authenticated/CSRF-protected manual checks and once-per-session web behavior pass.
 - Completed file outcomes commit after each root; an interruption retains these commits. Root timeout/cancellation never infers absence from unfinished checks. Every completed check records unchanged outcomes as well as changes/errors.
 
-Remaining Phase 3 acceptance: successful-area discovery reconciliation, paginated title/file event history, progress refinements, concurrent dispatch, active-check cancellation and interrupted partial-result scenarios, actual ACL denial/hanging network shares, and performance tests. File history currently displays the latest 50 changes.
+At that checkpoint, reconciliation, event pagination, progress and concurrency/cancellation evidence were pending. Those implementation items are now covered by the latest results above; real-storage and performance acceptance remains unverified.
 
 **Linux revalidation is pending:** Docker CLI is installed but its daemon is not running. The Linux harness includes FFmpeg and all new tests; no updated Linux result is claimed. No owner media was scanned. Tests mutate only generated synthetic fixtures. Live storage, LAN, TMDB, host playback and backup/restore remain unverified.
 

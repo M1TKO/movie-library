@@ -15,7 +15,7 @@ use Symfony\Component\Process\Process;
 final class DiscoverHandler
 {
     public function __construct(private readonly Connection $db, private readonly CatalogWriter $catalog, private readonly WorkerLifecycle $worker,
-        private readonly float $rootTimeout = 300.0, private readonly float $runTimeout = 1800.0) {}
+        private readonly float $rootTimeout = 300.0, private readonly float $runTimeout = 1800.0, private readonly ?\App\Availability\DiscoveryReconciler $reconciler = null) {}
 
     public function __invoke(Discover $message): void
     {
@@ -29,7 +29,7 @@ final class DiscoverHandler
             $this->db->update('runs', ['state'=>'running','owner_token'=>$owner,'started_at'=>gmdate(DATE_ATOM),'heartbeat_at'=>gmdate(DATE_ATOM)], ['id'=>$message->runId]);
             $options = json_decode($run['options'], true, 512, JSON_THROW_ON_ERROR);
             $started = microtime(true);
-            $errors = false;
+            $errors = false; $verified = [];
             foreach ($options['roots'] as $root) {
                 if ($this->cancelled($message->runId)) { $this->finish($message->runId, 'cancelled', 'Cancelled; completed discoveries were retained.'); return; }
                 if (microtime(true) - $started >= $this->runTimeout) {
@@ -40,26 +40,37 @@ final class DiscoverHandler
                     $this->rootResult($message->runId, $root['id'], ['enumeration_outcome'=>'skipped','error_code'=>'scope_changed','error_reason'=>'Location was removed, disabled or changed after this scan was queued.']);
                     $errors = true; continue;
                 }
-                $errors = !$this->scanRoot($message->runId, $owner, $root, $options, min($this->rootTimeout, $this->runTimeout - (microtime(true) - $started))) || $errors;
+                $errors = !$this->scanRoot($message->runId, $owner, $root, $options, $verified, min($this->rootTimeout, $this->runTimeout - (microtime(true) - $started))) || $errors;
             }
             if ($this->cancelled($message->runId)) { $this->finish($message->runId, 'cancelled', 'Cancelled; completed discoveries were retained.'); return; }
-            $this->finish($message->runId, $errors ? 'completed_with_errors' : 'completed', $errors ? 'Discovery finished with errors. Partial discoveries were retained; inspect root and file results.' : 'Discovery finished. Unseen files retain their last known state; availability reconciliation is a later phase.');
+            ($this->reconciler ?? new \App\Availability\DiscoveryReconciler($this->db, new \App\Availability\AvailabilityRecorder($this->db)))->reconcile($message->runId, $verified, function () use ($message): void {
+                $this->worker->heartbeat();
+                static $lastBeat = 0;
+                if (time() > $lastBeat) {
+                    $this->db->update('runs', ['heartbeat_at'=>gmdate(DATE_ATOM)], ['id'=>$message->runId]);
+                    $lastBeat = time();
+                }
+            });
+            if ($this->cancelled($message->runId)) { $this->finish($message->runId, 'cancelled', 'Cancelled; committed results were retained.'); return; }
+            $errors = $errors || (int)$this->db->fetchOne('SELECT uncheckable FROM runs WHERE id=?', [$message->runId]) > 0;
+            $this->finish($message->runId, $errors ? 'completed_with_errors' : 'completed', $errors ? 'Discovery finished with errors. Partial discoveries were retained; inspect root and file results.' : 'Discovery finished. Missing transitions require successful enumeration evidence from every enabled membership.');
         } catch (\Throwable $e) {
             $this->db->executeStatement("UPDATE runs SET state='failed', finished_at=?, summary=? WHERE id=? AND owner_token=? AND state='running'", [gmdate(DATE_ATOM),'Discovery failed. Committed results were retained; retry from scan history.',$message->runId,$owner]);
             throw $e;
         } finally { $lock->release(); }
     }
 
-    private function scanRoot(string $runId, string $owner, array $root, array $options, float $timeout): bool
+    private function scanRoot(string $runId, string $owner, array $root, array $options, array &$verified, float $timeout): bool
     {
         $known = [];
         foreach ($this->db->fetchAllAssociative('SELECT normalized_path,size_bytes,modified_at,probe_state FROM media_files') as $file) { $known[$file['normalized_path']] = $file; }
         $input = ['root'=>$root['root_path'],'recursive'=>(bool)$root['recursive'],'exclusions'=>json_decode($root['exclusions'], true, 512, JSON_THROW_ON_ERROR),
             'extensions'=>$options['extensions'],'ffprobe'=>$options['ffprobe'],'known'=>$known];
         $process = new Process([PHP_BINARY, dirname(__DIR__, 2).'/bin/discover-root.php'], dirname(__DIR__, 2), null, json_encode($input, JSON_THROW_ON_ERROR), $timeout);
+        $directories = [];
         $buffer = ''; $done = false; $errors = false; $lastBeat = 0.0;
         $this->rootResult($runId, $root['id'], ['enumeration_outcome'=>'running']);
-        $consume = function (string $chunk) use (&$buffer, &$done, &$errors, $runId, $root): void {
+        $consume = function (string $chunk) use (&$buffer, &$done, &$errors, &$directories, $runId, $root): void {
             $buffer .= $chunk;
             if (strlen($buffer) > 2 * 1024 * 1024) { throw new \RuntimeException('Filesystem output limit exceeded.'); }
             while (($newline = strpos($buffer, "\n")) !== false) {
@@ -68,6 +79,8 @@ final class DiscoverHandler
                 if ($record['kind'] === 'file') {
                     $this->catalog->record($runId, $root, $record);
                     if (isset($record['probe']['probe_state']) && $record['probe']['probe_state'] !== 'complete') { $errors = true; }
+                } elseif ($record['kind'] === 'directory') {
+                    $directories[$record['relative']] = array_fill_keys($record['entries'], true);
                 } elseif ($record['kind'] === 'accessible') {
                     $this->rootResult($runId, $root['id'], ['accessibility'=>'accessible']);
                 } elseif ($record['kind'] === 'error') {
@@ -105,6 +118,7 @@ final class DiscoverHandler
         if (!$done && !$result['error_code']) {
             $this->rootResult($runId, $root['id'], ['error_code'=>'incomplete','error_reason'=>'Filesystem subprocess did not finish. Partial discoveries were retained.']);
         }
+        if ($done) { $verified[$root['id']] = ['root'=>$root,'directories'=>$directories]; }
         $this->rootResult($runId, $root['id'], ['enumeration_outcome'=>$errors ? 'completed_with_errors' : 'completed']);
         $result = $this->db->fetchAssociative('SELECT * FROM run_locations WHERE run_id=? AND location_id=?', [$runId,$root['id']]);
         $this->db->update('locations', ['last_scan_at'=>gmdate(DATE_ATOM),'status'=>$result['accessibility'] === 'accessible' ? 'accessible' : 'check_failed','last_error'=>$result['error_reason']], ['id'=>$root['id']]);

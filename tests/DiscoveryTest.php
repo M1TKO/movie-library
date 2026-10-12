@@ -352,4 +352,145 @@ final class DiscoveryTest extends KernelTestCase
         self::assertSame(0,(int)$this->db->fetchOne('SELECT newly_missing FROM runs WHERE id=?',[$id]));
         self::assertSame('completed_with_errors',$this->db->fetchOne('SELECT state FROM runs WHERE id=?',[$id]));
     }
+    public function testDiscoveryReconcilesAbsenceAndRestorationWithoutRepeatingEvents(): void
+    {
+        mkdir($this->fixture.'/nested');
+        $path = $this->fixture.'/nested/Example.Movie.2020.mkv';
+        file_put_contents($path, 'synthetic');
+        $this->location($this->fixture);
+        $dispatcher = self::getContainer()->get(ScanDispatcher::class);
+        $dispatcher->dispatch(); $this->worker()->mustRun();
+        unlink($path); rmdir($this->fixture.'/nested');
+        $run = $dispatcher->dispatch(); $this->worker()->mustRun();
+        self::assertSame('missing', $this->db->fetchOne('SELECT last_known_availability FROM media_files'));
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT newly_missing FROM runs WHERE id=?', [$run]));
+        $again = $dispatcher->dispatch(); $this->worker()->mustRun();
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT unchanged FROM runs WHERE id=?', [$again]));
+        self::assertSame(1, (int)$this->db->fetchOne("SELECT COUNT(*) FROM events WHERE event_type='newly_missing'"));
+        mkdir($this->fixture.'/nested'); file_put_contents($path, 'synthetic');
+        $restore = $dispatcher->dispatch(); $this->worker()->mustRun();
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT restored FROM runs WHERE id=?', [$restore]));
+    }
+
+    public function testSuccessfulDirectoryEvidenceDoesNotInferAbsenceInFailedSubtreeOrUnscannedOverlap(): void
+    {
+        mkdir($this->fixture.'/nested');
+        file_put_contents($this->fixture.'/nested/Example.Movie.2020.mkv', 'synthetic');
+        $outer = $this->location($this->fixture); $inner = $this->location($this->fixture.'/nested');
+        $dispatcher = self::getContainer()->get(ScanDispatcher::class);
+        $dispatcher->dispatch(); $this->worker()->mustRun();
+        unlink($this->fixture.'/nested/Example.Movie.2020.mkv');
+        $run = $dispatcher->dispatch($outer); $this->worker()->mustRun();
+        self::assertSame('available', $this->db->fetchOne('SELECT last_known_availability FROM media_files'));
+        self::assertSame('check_failed', $this->db->fetchOne('SELECT check_outcome FROM media_files'));
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT uncheckable FROM runs WHERE id=?', [$run]));
+        // Simulate completed root listing with an unreadable child: no child evidence exists.
+        $run = $dispatcher->dispatch();
+        $roots = $this->db->fetchAllAssociative('SELECT * FROM locations ORDER BY id');
+        $reconciler = self::getContainer()->get(\App\Availability\DiscoveryReconciler::class);
+        $reconciler->reconcile($run, [$outer=>['root'=>$roots[0], 'directories'=>[''=>['nested'=>true]]]]);
+        self::assertSame('available', $this->db->fetchOne('SELECT last_known_availability FROM media_files'));
+        self::assertSame(0, (int)$this->db->fetchOne('SELECT newly_missing FROM runs WHERE id=?', [$run]));
+    }
+
+    public function testConcurrentAvailabilityDispatchCoalescesAcrossProcesses(): void
+    {
+        file_put_contents($this->fixture.'/Example.Movie.2020.mkv', 'synthetic');
+        $this->location($this->fixture);
+        self::getContainer()->get(ScanDispatcher::class)->dispatch(); $this->worker()->mustRun();
+        $code = 'require "vendor/autoload.php"; require "config/bootstrap.php"; $k=new App\\Kernel("test",false); $k->boot(); echo $k->getContainer()->get("test.service_container")->get(App\\Availability\\CheckDispatcher::class)->dispatch();';
+        $processes = [];
+        for ($i=0;$i<2;++$i) {
+            $processes[] = $p = new Process([PHP_BINARY, '-r', $code], dirname(__DIR__), ['APP_ENV'=>'test','APP_DEBUG'=>'0','APP_DATA_DIR'=>$_SERVER['APP_DATA_DIR']], null, 20);
+            $p->start();
+        }
+        foreach ($processes as $p) { $p->wait(); self::assertTrue($p->isSuccessful(), $p->getErrorOutput()); }
+        self::assertSame($processes[0]->getOutput(), $processes[1]->getOutput());
+        self::assertSame(1, (int)$this->db->fetchOne("SELECT COUNT(*) FROM runs WHERE job_type='availability'"));
+    }
+
+    public function testActiveAvailabilityCancellationRetainsCompletedRootResults(): void
+    {
+        mkdir($this->fixture.'/first'); mkdir($this->fixture.'/second');
+        file_put_contents($this->fixture.'/first/Example.Movie.2020.mkv', 'synthetic');
+        $first=$this->location($this->fixture.'/first'); $second=$this->location($this->fixture.'/second');
+        self::getContainer()->get(ScanDispatcher::class)->dispatch($first); $this->worker()->mustRun();
+        $now=gmdate(DATE_ATOM);
+        $this->db->transactional(function () use ($second,$now): void {
+            for ($i=0;$i<2000;++$i) {
+                $name='Absent.'.$i.'.mkv';
+                $this->db->insert('media_files',['filename'=>$name,'original_path'=>$this->fixture.'/second/'.$name,'normalized_path'=>$this->fixture.'/second/'.$name,'last_known_availability'=>'available','check_outcome'=>'available','created_at'=>$now,'updated_at'=>$now]);
+                $this->db->insert('file_locations',['file_id'=>$this->db->lastInsertId(),'location_id'=>$second,'relative_path'=>$name]);
+            }
+        });
+        $run=self::getContainer()->get(\App\Availability\CheckDispatcher::class)->dispatch();
+        $process=$this->worker(); $process->start();
+        try {
+            $deadline=microtime(true)+15;
+            while (microtime(true)<$deadline && $process->isRunning() && $this->db->fetchOne('SELECT enumeration_outcome FROM run_locations WHERE run_id=? AND location_id=?',[$run,$second]) !== 'running') { usleep(1000); }
+            self::assertSame('running',$this->db->fetchOne('SELECT state FROM runs WHERE id=?',[$run]));
+            self::assertSame(1,(int)$this->db->fetchOne('SELECT examined FROM runs WHERE id=?',[$run]));
+            $this->db->update('runs',['cancel_requested'=>1],['id'=>$run]); $process->wait();
+            self::assertTrue($process->isSuccessful(),$process->getErrorOutput());
+            self::assertSame('cancelled',$this->db->fetchOne('SELECT state FROM runs WHERE id=?',[$run]));
+            self::assertSame('unchanged',$this->db->fetchOne('SELECT outcome FROM run_file_results WHERE run_id=? ORDER BY id LIMIT 1',[$run]));
+            self::assertGreaterThan(0,(int)$this->db->fetchOne("SELECT COUNT(*) FROM media_files WHERE last_known_availability='available'"));
+        } finally { if ($process->isRunning()) { $process->stop(0); } }
+    }
+
+    public function testRestartRetainsDurableAvailabilityPartialResults(): void
+    {
+        file_put_contents($this->fixture.'/Example.Movie.2020.mkv','synthetic'); $location=$this->location($this->fixture);
+        self::getContainer()->get(ScanDispatcher::class)->dispatch(); $this->worker()->mustRun();
+        $run=self::getContainer()->get(\App\Availability\CheckDispatcher::class)->dispatch();
+        $this->db->update('runs',['state'=>'running'],['id'=>$run]);
+        $this->db->update('run_locations',['enumeration_outcome'=>'running'],['run_id'=>$run,'location_id'=>$location]);
+        $file=$this->db->fetchAssociative('SELECT * FROM media_files LIMIT 1');
+        (new \App\Availability\AvailabilityRecorder($this->db))->record($run,$file,'missing');
+        $this->worker()->mustRun();
+        self::assertSame('interrupted',$this->db->fetchOne('SELECT state FROM runs WHERE id=?',[$run]));
+        self::assertSame(1,(int)$this->db->fetchOne('SELECT newly_missing FROM runs WHERE id=?',[$run]));
+        self::assertSame('missing',$this->db->fetchOne('SELECT last_known_availability FROM media_files WHERE id=?',[$file['id']]));
+        self::assertSame('newly_missing',$this->db->fetchOne('SELECT outcome FROM run_file_results WHERE run_id=?',[$run]));
+    }
+
+    public function testReconciliationUsesSuccessfulSiblingEvidenceAndRetainsFailedSubtree(): void
+    {
+        foreach (['good','blocked'] as $directory) {
+            mkdir($this->fixture.'/'.$directory);
+            file_put_contents($this->fixture.'/'.$directory.'/Example.2020.mkv', 'synthetic');
+        }
+        $root = $this->location($this->fixture);
+        $dispatcher = self::getContainer()->get(ScanDispatcher::class);
+        $dispatcher->dispatch(); $this->worker()->mustRun();
+        $run = $dispatcher->dispatch();
+        $location = $this->db->fetchAssociative('SELECT * FROM locations WHERE id=?', [$root]);
+        self::getContainer()->get(\App\Availability\DiscoveryReconciler::class)->reconcile($run, [
+            $root=>['root'=>$location,'directories'=>[''=>['good'=>true,'blocked'=>true],'good'=>[]]],
+        ]);
+        self::assertSame('missing', $this->db->fetchOne("SELECT last_known_availability FROM media_files WHERE original_path LIKE '%/good/%' OR original_path LIKE '%\good\%'"));
+        self::assertSame('available', $this->db->fetchOne("SELECT last_known_availability FROM media_files WHERE original_path LIKE '%/blocked/%' OR original_path LIKE '%\blocked\%'"));
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT newly_missing FROM runs WHERE id=?', [$run]));
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT uncheckable FROM runs WHERE id=?', [$run]));
+    }
+
+    public function testCancellationDuringReconciliationPreservesCommittedResultsAndUntouchedFiles(): void
+    {
+        file_put_contents($this->fixture.'/First.2020.mkv', 'synthetic');
+        file_put_contents($this->fixture.'/Second.2020.mkv', 'synthetic');
+        $root = $this->location($this->fixture);
+        $dispatcher = self::getContainer()->get(ScanDispatcher::class);
+        $dispatcher->dispatch(); $this->worker()->mustRun();
+        $run = $dispatcher->dispatch();
+        $location = $this->db->fetchAssociative('SELECT * FROM locations WHERE id=?', [$root]);
+        $ticks = 0;
+        self::getContainer()->get(\App\Availability\DiscoveryReconciler::class)->reconcile($run,
+            [$root=>['root'=>$location,'directories'=>[''=>[]]]], function () use (&$ticks, $run): void {
+                if (++$ticks === 2) { $this->db->update('runs', ['cancel_requested'=>1], ['id'=>$run]); }
+            });
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT examined FROM runs WHERE id=?', [$run]));
+        self::assertSame(1, (int)$this->db->fetchOne("SELECT COUNT(*) FROM media_files WHERE last_known_availability='available'"));
+        self::assertSame(1, (int)$this->db->fetchOne('SELECT COUNT(*) FROM run_file_results WHERE run_id=?', [$run]));
+        self::assertSame(1, (int)$this->db->fetchOne("SELECT COUNT(*) FROM events WHERE run_id=? AND event_type='newly_missing'", [$run]));
+    }
 }

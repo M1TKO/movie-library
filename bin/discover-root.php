@@ -35,12 +35,14 @@ try {
         $handle = @opendir($directory);
         if ($handle === false) { ++$errors; emit(['kind'=>'error','code'=>'directory_unreadable','message'=>'Cannot enumerate a directory: '.$directory]); continue; }
         if ($relativeDirectory === '') { emit(['kind'=>'accessible']); }
+        $entries = [];
         try {
             while (($name = readdir($handle)) !== false) {
                 if ($name === '.' || $name === '..') { continue; }
                 if (++$visited > 100000 || microtime(true) - $start > 290) {
                     emit(['kind'=>'error','code'=>'scan_limit','message'=>'Root operation reached its entry or time limit; partial discoveries were retained.']); exit(3);
                 }
+                $entries[] = PHP_OS_FAMILY === 'Windows' ? mb_strtolower($name) : $name;
                 $relative = $relativeDirectory === '' ? $name : $relativeDirectory.'/'.$name;
                 if (ScanOptions::excluded($relative, $options['exclusions'])) { continue; }
                 $path = rtrim($directory, '/\\').DIRECTORY_SEPARATOR.$name;
@@ -68,6 +70,7 @@ try {
                 }
                 emit(['kind'=>'file','path'=>$path,'relative'=>$relative,'size'=>$before['size'],'mtime'=>$before['mtime'],'probe'=>$probe]);
             }
+            emit(['kind'=>'directory','relative'=>PHP_OS_FAMILY === 'Windows' ? mb_strtolower($relativeDirectory) : $relativeDirectory,'entries'=>$entries]);
         } finally { closedir($handle); }
     }
     emit(['kind'=>'done','errors'=>$errors]);

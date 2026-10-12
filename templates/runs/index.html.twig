@@ -2,4 +2,4 @@
 {% block body %}<p class="eyebrow">DISCOVERY AND AVAILABILITY</p><h1>Job history</h1>
 <form method="post" action="{{ path('scan_start') }}"><input type="hidden" name="_token" value="{{ csrf_token('scan') }}"><button>Scan all enabled locations</button></form>
 {% for run in runs %}<article class="panel"><a href="{{ path('run_detail', {id:run.id}) }}">{{ run.job_type|capitalize }} · {{ run.queued_at }} · {{ run.state|replace({'_':' '}) }}</a><p>{{ run.examined }} files examined · {{ run.added }} added · {{ run.changed }} changed</p></article>{% else %}<p>No scans yet. Add your locations, then start a scan.</p>{% endfor %}
-<div class="row">{% if page > 1 %}<a href="{{ path('runs', {page:page-1}) }}">Previous</a>{% endif %}{% if runs|length == 50 %}<a href="{{ path('runs', {page:page+1}) }}">Next</a>{% endif %}</div>{% endblock %}
+<div class="row">{% if page > 1 %}<a href="{{ path('runs', {page:page-1}) }}">Previous</a>{% endif %}{% if page * 50 < total %}<a href="{{ path('runs', {page:page+1}) }}">Next</a>{% endif %}</div>{% endblock %}

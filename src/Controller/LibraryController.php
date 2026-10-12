@@ -13,34 +13,30 @@ use Symfony\Component\Process\Process;
 final class LibraryController extends AbstractController
 {
     #[Route('/', name: 'library', methods: ['GET'])]
-    public function index(Connection $db, Request $request, \App\Availability\CheckDispatcher $checks): Response
+    public function index(Connection $db, Request $request, \App\Availability\CheckDispatcher $checks, \App\Catalog\LibraryQuery $library): Response
     {
         if (!$request->getSession()->get('availability_requested', false)) {
             $checks->dispatch('library_session');
             $request->getSession()->set('availability_requested', true);
         }
-        $page = max(1, min(1000000, $request->query->getInt('page', 1)));
-        $view = $request->query->getString('view', 'files');
-        if (!in_array($view, ['files','unresolved','movies','series'], true)) { $view = 'files'; }
         $stats = [];
         foreach (['movies','series','episodes','media_files'] as $table) { $stats[$table] = (int)$db->fetchOne('SELECT COUNT(*) FROM '.$table); }
+        $stats['episodes'] = (int)$db->fetchOne('SELECT COUNT(*) FROM episodes e WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)');
         $stats['unresolved'] = (int)$db->fetchOne('SELECT COUNT(*) FROM media_files f WHERE NOT EXISTS(SELECT 1 FROM file_content_links l WHERE l.file_id=f.id)');
-        $where = $view === 'unresolved' ? ' WHERE NOT EXISTS(SELECT 1 FROM file_content_links l WHERE l.file_id=f.id)' : '';
-        $sql = in_array($view, ['movies','series'], true) ? 'SELECT * FROM '.$view.' ORDER BY title,id' : 'SELECT f.* FROM media_files f'.$where.' ORDER BY filename,id';
-        $rows = $db->fetchAllAssociative($sql.' LIMIT 50 OFFSET ?', [($page-1)*50], [\PDO::PARAM_INT]);
-        return $this->render('library/index.html.twig', ['stats'=>$stats,'rows'=>$rows,'view'=>$view,'page'=>$page,'total'=>$stats[$view === 'files' ? 'media_files' : $view], 'availabilityRun'=>$db->fetchAssociative("SELECT * FROM runs WHERE job_type='availability' ORDER BY queued_at DESC,id DESC LIMIT 1")]);
+        $stats['available_bytes'] = (int)$db->fetchOne("SELECT COALESCE(SUM(size_bytes),0) FROM media_files WHERE check_outcome='available'");
+        return $this->render('library/index.html.twig', $library->browse($request) + ['stats'=>$stats,'availabilityRun'=>$db->fetchAssociative("SELECT * FROM runs WHERE job_type='availability' ORDER BY queued_at DESC,id DESC LIMIT 1")]);
     }
     #[Route('/files/{id}', name: 'file_detail', requirements: ['id'=>'\d+'], methods: ['GET'])]
-    public function fileDetail(int $id, Connection $db): Response
+    public function fileDetail(int $id, Request $request, Connection $db, \App\Catalog\History $history): Response
     {
         $file = $db->fetchAssociative('SELECT * FROM media_files WHERE id=?', [$id]);
         if (!$file) { throw $this->createNotFoundException(); }
-        return $this->render('library/file.html.twig', ['file'=>$file,
+        return $this->render('library/file.html.twig', $history->page('file', $id, $request->query->getInt('history_page', 1)) + ['file'=>$file,
             'links'=>$db->fetchAllAssociative('SELECT m.id movie_id,m.title movie_title,s.id series_id,s.title series_title,se.season_number,e.episode_number FROM file_content_links l LEFT JOIN movies m ON m.id=l.movie_id LEFT JOIN episodes e ON e.id=l.episode_id LEFT JOIN seasons se ON se.id=e.season_id LEFT JOIN series s ON s.id=se.series_id WHERE l.file_id=?', [$id]),
-            'events'=>$db->fetchAllAssociative('SELECT * FROM events WHERE file_id=? ORDER BY id DESC LIMIT 50', [$id]), 'locations'=>$db->fetchAllAssociative('SELECT l.label,l.enabled,fl.in_scope FROM file_locations fl JOIN locations l ON l.id=fl.location_id WHERE fl.file_id=?', [$id])]);
+            'locations'=>$db->fetchAllAssociative('SELECT l.label,l.enabled,fl.in_scope FROM file_locations fl JOIN locations l ON l.id=fl.location_id WHERE fl.file_id=?', [$id])]);
     }
     #[Route('/catalog/{type}/{id}', name: 'title_detail', requirements: ['type'=>'movies|series','id'=>'\d+'], methods: ['GET'])]
-    public function title(string $type, int $id, Request $request, Connection $db): Response
+    public function title(string $type, int $id, Request $request, Connection $db, \App\Catalog\History $history): Response
     {
         $title = $db->fetchAssociative('SELECT * FROM '.$type.' WHERE id=?', [$id]);
         if (!$title) {
@@ -54,8 +50,8 @@ final class LibraryController extends AbstractController
             ? 'SELECT f.*,NULL season_number,NULL episode_number,NULL episode_title,NULL episode_imdb FROM media_files f JOIN file_content_links l ON l.file_id=f.id WHERE l.movie_id=? ORDER BY f.id'
             : 'SELECT f.*,s.season_number,e.episode_number,e.title episode_title,e.imdb_id episode_imdb FROM episodes e JOIN seasons s ON s.id=e.season_id JOIN file_content_links l ON l.episode_id=e.id JOIN media_files f ON f.id=l.file_id WHERE s.series_id=? ORDER BY s.season_number,e.episode_number,f.id';
         $files = $db->fetchAllAssociative($sql.' LIMIT 50 OFFSET ?', [$id,($page-1)*50], [\PDO::PARAM_INT,\PDO::PARAM_INT]);
-        return $this->render('library/title.html.twig', ['title'=>$title,'type'=>$type,'files'=>$files,'page'=>$page,'poster'=>\App\Metadata\TmdbProvider::posterKey($title['poster_path']),
-            'genres'=>json_decode($title['genres'],true),'events'=>$db->fetchAllAssociative('SELECT * FROM events WHERE '.($type==='movies'?'movie_id':'series_id').'=? ORDER BY id DESC LIMIT 50',[$id])]);
+        return $this->render('library/title.html.twig', $history->page($type, $id, $request->query->getInt('history_page', 1)) + ['title'=>$title,'type'=>$type,'files'=>$files,'page'=>$page,'poster'=>\App\Metadata\TmdbProvider::posterKey($title['poster_path']),
+            'genres'=>json_decode($title['genres'],true)]);
     }
     #[Route('/settings', name: 'settings', methods: ['GET','POST'])]
     public function settings(Connection $db, Request $request): Response

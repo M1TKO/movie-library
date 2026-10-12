@@ -28,7 +28,7 @@ final class CatalogWebTest extends WebTestCase
         self::assertSelectorTextContains('#run-progress','Queued');
         self::assertSelectorExists('[hx-trigger="every 2s"]');
         $client->submitForm('Cancel scan'); $client->followRedirect();
-        self::assertSelectorTextContains('#run-progress','Cancelled'); self::assertSelectorNotExists('[hx-trigger]');
+        self::assertSelectorTextContains('#run-progress','Cancelled'); self::assertSelectorNotExists('#run-progress[hx-trigger]');
         $db = self::getContainer()->get(Connection::class);
         $db->insert('media_files',['original_path'=>$path.'/video001.mkv','normalized_path'=>$path.'/video001.mkv','filename'=>'video001.mkv','size_bytes'=>0,'created_at'=>gmdate(DATE_ATOM),'updated_at'=>gmdate(DATE_ATOM)]);
         $id = (int)$db->lastInsertId();
@@ -41,6 +41,10 @@ final class CatalogWebTest extends WebTestCase
         $client->submitForm('Check known file availability'); self::assertResponseRedirects();
         $client->followRedirect(); self::assertSelectorTextContains('h1','Availability progress');
         $client->request('GET','/files/'.$id); self::assertResponseIsSuccessful(); self::assertSelectorTextContains('dl','0 bytes');
+        self::assertSelectorExists('button[data-copy-path]'); self::assertSelectorTextContains('.copy-path code', 'video001.mkv');
+        $client->request('GET','/?view=unresolved&layout=posters&q=video001&per_page=25'); self::assertResponseIsSuccessful(); self::assertSelectorTextContains('.poster-grid','video001.mkv');
+        $client->request('GET','/?q=does-not-exist'); self::assertSelectorTextContains('.empty','No matching entries');
+        $client->request('GET','/runs?page=99999'); self::assertResponseIsSuccessful(); self::assertSelectorExists('a[href^="/runs/"]');
         $client->request('GET','/settings'); self::assertResponseIsSuccessful();
         $client->submitForm('Save settings',['extensions'=>'mkv mp4','ffprobe'=>'ffprobe']); self::assertResponseRedirects('/settings');
         $client->request('GET','/runs'); self::assertResponseIsSuccessful();
