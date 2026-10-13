@@ -19,7 +19,7 @@ final class Experience
     }
     public function seasons(int $id): array
     {
-        $rows=$this->db->fetchAllAssociative('SELECT s.* FROM seasons s WHERE series_id=? ORDER BY season_number,id',[$id]);
+        $rows=$this->db->fetchAllAssociative('SELECT s.* FROM seasons s WHERE series_id=? AND EXISTS(SELECT 1 FROM episodes e JOIN file_content_links l ON l.episode_id=e.id WHERE e.season_id=s.id) ORDER BY season_number,id',[$id]);
         foreach ($rows as &$row) {
             $row['episodes']=$this->episodes((int)$row['id']);
             $row['watched']=count(array_filter($row['episodes'],static fn(array $e)=>(bool)$e['watched']));

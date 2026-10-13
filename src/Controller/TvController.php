@@ -14,7 +14,11 @@ final class TvController extends AbstractController
     {
         $season=$db->fetchAssociative('SELECT s.*,t.title series_title FROM seasons s JOIN series t ON t.id=s.series_id WHERE s.id=?',[$id]);
         if (!$season) { throw $this->createNotFoundException(); }
-        return $this->render('library/season.html.twig',['season'=>$season,'episodes'=>$experience->episodes($id)]);
+        $episodes=$experience->episodes($id);
+        $watched=count(array_filter($episodes,static fn(array $episode)=>(bool)$episode['watched']));
+        $state=!$watched?'Unwatched':($watched===count($episodes)?'Watched':'Partially watched');
+        $totals=$experience->totals('SELECT f.* FROM media_files f WHERE EXISTS(SELECT 1 FROM file_content_links l JOIN episodes e ON e.id=l.episode_id WHERE l.file_id=f.id AND e.season_id=?)',[$id]);
+        return $this->render('library/season.html.twig',compact('season','episodes','watched','state','totals'));
     }
     #[Route('/episodes/{id}',name:'episode_detail',requirements:['id'=>'\d+'],methods:['GET'])]
     public function episode(int $id,Request $request,Connection $db,Experience $experience,\App\Catalog\History $history): Response

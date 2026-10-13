@@ -1,6 +1,6 @@
 # Implementation progress
 
-Last updated: 2026-10-12. Baseline: `Movie-Library-Specification.md` v1.3.
+Last updated: 2026-10-13. Baseline: `Movie-Library-Specification.md` v1.3.
 
 **Mandatory platform requirement: Windows AND Linux.** All phases must preserve native operation on both; do not add Windows-only assumptions to shared code. Use platform adapters for paths, process control, host actions and permissions. Existing Windows-only wording below describes historical validation, not reduced scope.
 
@@ -102,7 +102,7 @@ Exit evidence: AC-06–09, AC-23–24; local operation unaffected by provider fa
 ## Phase 5 — Library experience
 
 - [x] Poster/table views, combined search/filters, safe sorting and stable pagination; preserve filters across layout/view/page changes.
-- [x] Movie/series/season/episode navigation with paginated copies and distinct availability/storage breakdowns, including specials and multi-episode links.
+- [x] Movie/series/season/episode navigation with paginated copies and distinct availability/storage breakdowns, including specials and multi-episode links. Season pages show derived watched state and deduplicated storage/availability totals; series navigation excludes seasons without cataloged copies.
 - [x] Watched/unwatched persistence, watched timestamps and audit history; season/series bulk preview, catalog-only scope and stale-preview rejection under a transaction.
 - [x] Complete whole-library and filtered physical-file/storage, watched movie/episode and derived series-state totals. Multi-episode files count once in storage.
 - [x] Copy path with selectable-text fallback and success/failure status on file/movie/episode pages; real-browser keyboard copy succeeds, denied-clipboard fallback has automated JavaScript coverage.

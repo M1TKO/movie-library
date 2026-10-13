@@ -76,6 +76,26 @@ final class PhaseFiveTest extends WebTestCase
         $this->client->clickLink('Episode 1 · Episode 1'); self::assertResponseIsSuccessful(); self::assertSelectorTextContains('main','double.mkv');
         self::assertSelectorTextContains('main','missing'); self::assertSelectorExists('[data-copy-path]');
     }
+    public function testSeasonSummaryDeduplicatesCopiesAndOmitsUnownedSeasons(): void
+    {
+        $this->db->update('episodes',['watched'=>1],['id'=>$this->episodes[0]]);
+        $this->db->insert('seasons',['series_id'=>$this->series,'season_number'=>9]);
+        $unownedSeason=(int)$this->db->lastInsertId();
+        $now=gmdate(DATE_ATOM);
+        $this->db->insert('episodes',['season_id'=>$unownedSeason,'episode_number'=>1,'title'=>'Provider only','created_at'=>$now,'updated_at'=>$now]);
+        $experience=self::getContainer()->get(Experience::class);
+        self::assertCount(1,$experience->seasons($this->series));
+        $this->client->request('GET','/catalog/series/'.$this->series);
+        self::assertSelectorTextNotContains('nav[aria-label="Seasons"]','Season 9');
+        $this->client->request('GET','/seasons/'.$this->season);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('main','Partially watched');
+        self::assertSelectorTextContains('main','1 / 2 cataloged episodes watched');
+        self::assertSelectorTextContains('main','1 physical copies');
+        self::assertSelectorTextContains('main','0 available, 1 missing, 0 uncheckable');
+        $this->client->request('GET','/episodes/'.$this->episodes[0]);
+        self::assertSelectorTextContains('a[href="/seasons/'.$this->season.'"]','Specials');
+    }
     public function testWatchedFormsRejectCsrfAndPersistAcrossKernelRestart(): void
     {
         $this->client->request('POST','/watched/movies/'.$this->movie,['state'=>'1']);

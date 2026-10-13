@@ -1,4 +1,15 @@
-# Latest validation — 12 October 2026
+# Latest validation — 13 October 2026
+
+Phase 5 completion review added season watched summaries and distinct storage/availability totals, omitted provider-only seasons from series navigation, and labeled season-zero episode breadcrumbs as Specials. A multi-episode file still counts once in season storage; missing copies remain cataloged.
+
+- Full Windows PHPUnit with bundled FFmpeg/FFprobe: **101 tests, 544 assertions passed, no skips**, in **45.381 seconds** on PHP 8.2.0.
+- Focused Phase 5 checks: **7 tests, 86 assertions passed** after clearing the compiled test cache.
+- Container lint, all **26 Twig templates**, Composer strict validation, PHP syntax and **3 Node tests** pass.
+- Linux execution remains pending: Docker engine is stopped (confirmed by the missing engine pipe). Actual desktop playback/folder launches and real-storage acceptance remain unverified. Only isolated synthetic fixtures were used.
+
+Next implementation remains Phase 6 backup and restore. Phase 5 implementation is complete; the environment-dependent acceptance limits above remain open.
+
+## Previous validation — 12 October 2026
 
 Phases 2–5 implementation complete. Cross-platform and real-storage acceptance is still pending.
 
