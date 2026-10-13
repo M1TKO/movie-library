@@ -9,6 +9,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class TmdbProvider implements Provider
 {
+    private const CACHE_TTL = 604800;
+    private const CACHE_LIMIT = 2000;
+    private const MAX_RESPONSE_BYTES = 2097152;
     private float $lastRequest = 0;
     public function __construct(private readonly HttpClientInterface $http, private readonly Connection $db, private readonly Credentials $credentials) {}
     public function validate(): void
@@ -46,10 +49,18 @@ final class TmdbProvider implements Provider
     }
     private function request(string $path, array $query, bool $cache = true): array
     {
-        $identity = hash('sha256', $path . '?' . http_build_query($query));
-        $row = $cache ? $this->db->fetchAssociative("SELECT * FROM metadata_cache WHERE provider='tmdb' AND request_identity=?", [$identity]) : false;
-        if ($row && strtotime($row['expires_at']) > time()) {
-            return json_decode($row['payload'], true, 64, JSON_THROW_ON_ERROR);
+        ksort($query);
+        $identity = hash('sha256', $path . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986));
+        $row = $cache ? $this->db->fetchAssociative("SELECT payload FROM metadata_cache WHERE provider='tmdb' AND request_identity=? AND cache_state='complete' AND expires_at > ?", [$identity, gmdate(DATE_ATOM)]) : false;
+        if ($row) {
+            try {
+                $data = json_decode($row['payload'], true, 64, JSON_THROW_ON_ERROR);
+                if (is_array($data)) {
+                    return $data;
+                }
+            } catch (\JsonException) {
+                $this->db->executeStatement("DELETE FROM metadata_cache WHERE provider='tmdb' AND request_identity=?", [$identity]);
+            }
         }
         $token = $this->credentials->read();
         if ($token === '') {
@@ -83,7 +94,7 @@ final class TmdbProvider implements Provider
                 $body = '';
                 foreach ($this->http->stream($response) as $chunk) {
                     $body .= $chunk->getContent();
-                    if (strlen($body) > 2 * 1024 * 1024) {
+                    if (strlen($body) > self::MAX_RESPONSE_BYTES) {
                         $response->cancel();
                         throw new ProviderFailure('TMDB response exceeded the size limit.');
                     }
@@ -93,8 +104,8 @@ final class TmdbProvider implements Provider
                     throw new ProviderFailure('TMDB returned invalid metadata.');
                 }
                 if ($cache) {
-                    $this->db->executeStatement("INSERT INTO metadata_cache(provider,request_identity,payload,fetched_at,expires_at,cache_state) VALUES('tmdb',?,?,?,?, 'complete') ON CONFLICT(provider,request_identity) DO UPDATE SET payload=excluded.payload,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at", [$identity,$body,gmdate(DATE_ATOM),gmdate(DATE_ATOM, time() + 7 * 86400)]);
-                    $this->db->executeStatement("DELETE FROM metadata_cache WHERE provider='tmdb' AND request_identity NOT IN (SELECT request_identity FROM metadata_cache WHERE provider='tmdb' ORDER BY fetched_at DESC,request_identity LIMIT 2000)");
+                    $this->db->executeStatement("INSERT INTO metadata_cache(provider,request_identity,payload,fetched_at,expires_at,cache_state) VALUES('tmdb',?,?,?,?, 'complete') ON CONFLICT(provider,request_identity) DO UPDATE SET payload=excluded.payload,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at,cache_state=excluded.cache_state", [$identity,$body,gmdate(DATE_ATOM),gmdate(DATE_ATOM, time() + self::CACHE_TTL)]);
+                    $this->db->executeStatement("DELETE FROM metadata_cache WHERE provider='tmdb' AND request_identity NOT IN (SELECT request_identity FROM metadata_cache WHERE provider='tmdb' ORDER BY fetched_at DESC,request_identity LIMIT " . self::CACHE_LIMIT . ")");
                 }
                 return $data;
             } catch (ProviderFailure $e) {
