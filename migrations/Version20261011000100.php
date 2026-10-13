@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
@@ -7,7 +9,10 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20261011000100 extends AbstractMigration
 {
-    public function getDescription(): string { return 'Owner, settings, and media locations foundation'; }
+    public function getDescription(): string
+    {
+        return 'Owner, settings, and media locations foundation';
+    }
     public function up(Schema $schema): void
     {
         $this->addSql('CREATE TABLE owner_auth (id INTEGER PRIMARY KEY CHECK(id = 1), password_hash TEXT NOT NULL, created_at TEXT NOT NULL)');

@@ -2,9 +2,20 @@
 /var/
 /.env.local
 /.env.*.local
+/.env
 /.phpunit.cache/
 /tools/composer.phar
 /tools/caddy/
 /tools/ffmpeg/
 /*.log
 /tools/php/
+/.php-cs-fixer.cache
+/.idea/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Local editor files
+*.swp
+*.swo

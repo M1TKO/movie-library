@@ -1,6 +1,9 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Metadata;
+
 interface Provider
 {
     public function validate(): void;

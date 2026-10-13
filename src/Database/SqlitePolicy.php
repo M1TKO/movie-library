@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Database;
 
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsMiddleware;
@@ -13,7 +15,7 @@ final class SqlitePolicy implements Middleware
 {
     public function wrap(Driver $driver): Driver
     {
-        return new class($driver) extends AbstractDriverMiddleware {
+        return new class ($driver) extends AbstractDriverMiddleware {
             public function connect(array $params): Connection
             {
                 $connection = parent::connect($params);

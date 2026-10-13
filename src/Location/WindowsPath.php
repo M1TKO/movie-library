@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Location;
 
 final class WindowsPath
@@ -15,16 +17,20 @@ final class WindowsPath
             $prefix = substr($path, 0, 3);
             $rest = substr($path, 3);
         } elseif (preg_match('/^\\\\\\\\([^\\\\]+)\\\\([^\\\\]+)(?:\\\\(.*))?$/u', $path, $match)) {
-            $prefix = '\\\\'.$match[1].'\\'.$match[2].'\\';
+            $prefix = '\\\\' . $match[1] . '\\' . $match[2] . '\\';
             $rest = $match[3] ?? '';
         } else {
             throw new \InvalidArgumentException('Use an absolute drive path (D:\\Movies) or UNC share (\\\\server\\share).');
         }
         $parts = [];
         foreach (explode('\\', $rest) as $part) {
-            if ($part === '' || $part === '.') { continue; }
+            if ($part === '' || $part === '.') {
+                continue;
+            }
             if ($part === '..') {
-                if ($parts === []) { throw new \InvalidArgumentException('The path cannot go above its root.'); }
+                if ($parts === []) {
+                    throw new \InvalidArgumentException('The path cannot go above its root.');
+                }
                 array_pop($parts);
                 continue;
             }
@@ -33,12 +39,12 @@ final class WindowsPath
             }
             $parts[] = $part;
         }
-        return mb_strtolower($prefix.implode('\\', $parts), 'UTF-8');
+        return mb_strtolower($prefix . implode('\\', $parts), 'UTF-8');
     }
     public function overlaps(string $a, string $b): bool
     {
-        $a = rtrim($a, '\\').'\\';
-        $b = rtrim($b, '\\').'\\';
+        $a = rtrim($a, '\\') . '\\';
+        $b = rtrim($b, '\\') . '\\';
         return str_starts_with($a, $b) || str_starts_with($b, $a);
     }
 }

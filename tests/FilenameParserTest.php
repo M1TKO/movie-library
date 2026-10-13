@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Tests;
 
 use App\Catalog\FilenameParser;
@@ -11,7 +13,7 @@ final class FilenameParserTest extends TestCase
     #[DataProvider('names')]
     public function testLocalCandidates(string $path, string $type, ?string $title, ?int $year, ?int $season, array $episodes): void
     {
-        self::assertSame(['type'=>$type,'title'=>$title,'year'=>$year,'season'=>$season,'episodes'=>$episodes], (new FilenameParser())->parse($path));
+        self::assertSame(['type' => $type,'title' => $title,'year' => $year,'season' => $season,'episodes' => $episodes], (new FilenameParser())->parse($path));
     }
     public static function names(): iterable
     {
@@ -36,6 +38,6 @@ final class FilenameParserTest extends TestCase
     }
     public function testTvHintDoesNotGuessAbsoluteEpisodeNumbers(): void
     {
-        self::assertSame('unresolved', (new FilenameParser())->parse('Show 123.mkv','tv')['type']);
+        self::assertSame('unresolved', (new FilenameParser())->parse('Show 123.mkv', 'tv')['type']);
     }
 }

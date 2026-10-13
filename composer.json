@@ -27,12 +27,33 @@
     "symfony/yaml": "7.4.*"
   },
   "require-dev": {
+    "friendsofphp/php-cs-fixer": "3.75",
     "phpunit/phpunit": "^11.5",
     "symfony/browser-kit": "7.4.*",
     "symfony/css-selector": "7.4.*"
   },
-  "autoload": {"psr-4": {"App\\": "src/", "DoctrineMigrations\\": "migrations/"}},
-  "autoload-dev": {"psr-4": {"App\\Tests\\": "tests/"}},
-  "config": {"sort-packages": true, "allow-plugins": false},
-  "scripts": {"test": "phpunit", "check": ["@php bin/console lint:container", "@php bin/console lint:twig templates"]}
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/",
+      "DoctrineMigrations\\": "migrations/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "App\\Tests\\": "tests/"
+    }
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": false
+  },
+  "scripts": {
+    "test": "phpunit",
+    "check": [
+      "@php bin/console lint:container",
+      "@php bin/console lint:twig templates"
+    ],
+    "format": "php-cs-fixer fix --config=.php-cs-fixer.php",
+    "format-check": "php-cs-fixer fix --config=.php-cs-fixer.php --dry-run --diff"
+  }
 }

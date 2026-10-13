@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Tests;
 
 use Doctrine\DBAL\Connection;
@@ -53,7 +55,7 @@ final class FoundationTest extends WebTestCase
         $client->request('GET', '/setup');
         self::assertResponseRedirects('/login');
         // Rebooting the kernel on requests and a new DB connection both retain state.
-        $db = new \PDO('sqlite:'.$_SERVER['DATABASE_PATH']);
+        $db = new \PDO('sqlite:' . $_SERVER['DATABASE_PATH']);
         self::assertSame(2, (int) $db->query('SELECT COUNT(*) FROM locations')->fetchColumn());
         self::assertSame(0, (int) $db->query("SELECT recursive FROM locations WHERE label = 'TV share'")->fetchColumn());
         $client->request('GET', '/');

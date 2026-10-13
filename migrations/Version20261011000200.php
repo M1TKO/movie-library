@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
@@ -7,7 +9,10 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20261011000200 extends AbstractMigration
 {
-    public function getDescription(): string { return 'Catalog identities, copies, audit history and durable worker infrastructure'; }
+    public function getDescription(): string
+    {
+        return 'Catalog identities, copies, audit history and durable worker infrastructure';
+    }
 
     public function up(Schema $schema): void
     {
@@ -52,7 +57,9 @@ final class Version20261011000200 extends AbstractMigration
         $this->addSql("CREATE TABLE worker_health (name TEXT PRIMARY KEY, instance_id TEXT NOT NULL, pid INTEGER NOT NULL, state TEXT NOT NULL, started_at TEXT NOT NULL, heartbeat_at TEXT NOT NULL, last_message_at TEXT, last_error TEXT)");
         $this->addSql('CREATE TABLE worker_receipts (id TEXT PRIMARY KEY, queue_name TEXT NOT NULL, completed_at TEXT NOT NULL)');
         foreach (['movies' => ['title', 'watched', 'matching_state'], 'series' => ['title'], 'episodes' => ['watched'], 'media_files' => ['filename', 'check_outcome', 'last_checked_at'], 'file_locations' => ['location_id'], 'file_content_links' => ['movie_id', 'episode_id'], 'runs' => ['queued_at'], 'events' => ['occurred_at', 'file_id', 'movie_id', 'episode_id'], 'run_file_results' => ['file_id']] as $table => $columns) {
-            foreach ($columns as $column) { $this->addSql("CREATE INDEX idx_{$table}_{$column} ON $table($column)"); }
+            foreach ($columns as $column) {
+                $this->addSql("CREATE INDEX idx_{$table}_{$column} ON $table($column)");
+            }
         }
     }
 

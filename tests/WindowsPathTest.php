@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Tests;
 
 use App\Location\WindowsPath;
@@ -19,12 +21,19 @@ final class WindowsPathTest extends TestCase
     }
     #[DataProvider('validPaths')]
     public function testNormalizesWithoutAccessingTheFilesystem(string $input, string $expected): void
-    { self::assertSame($expected, (new WindowsPath())->normalize($input)); }
+    {
+        self::assertSame($expected, (new WindowsPath())->normalize($input));
+    }
     public static function invalidPaths(): array
-    { return array_map(fn($p) => [$p], ['relative', 'D:Movies', '\\\\server', 'D:\\..\\Movies', 'D:\\Movies:stream', 'D:\\Movies.', "D:\\bad\0path", '\\\\?\\D:\\Movies']); }
+    {
+        return array_map(fn($p) => [$p], ['relative', 'D:Movies', '\\\\server', 'D:\\..\\Movies', 'D:\\Movies:stream', 'D:\\Movies.', "D:\\bad\0path", '\\\\?\\D:\\Movies']);
+    }
     #[DataProvider('invalidPaths')]
     public function testRejectsUnsafeOrAmbiguousPaths(string $path): void
-    { $this->expectException(\InvalidArgumentException::class); (new WindowsPath())->normalize($path); }
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new WindowsPath())->normalize($path);
+    }
     public function testOverlapUsesDirectoryBoundaries(): void
     {
         $paths = new WindowsPath();

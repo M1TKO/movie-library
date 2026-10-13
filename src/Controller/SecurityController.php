@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Controller;
 
 use App\Security\{Owner, OwnerProvider};
@@ -16,8 +18,12 @@ final class SecurityController extends AbstractController
     #[Route('/setup', name: 'setup', methods: ['GET', 'POST'])]
     public function setup(Request $request, OwnerProvider $owners, Connection $db, UserPasswordHasherInterface $hasher): Response
     {
-        if (!in_array($request->getClientIp(), ['127.0.0.1', '::1'], true)) { return new Response('Owner setup is available only on the host computer.', 403); }
-        if ($owners->exists()) { return $this->redirectToRoute('login'); }
+        if (!in_array($request->getClientIp(), ['127.0.0.1', '::1'], true)) {
+            return new Response('Owner setup is available only on the host computer.', 403);
+        }
+        if ($owners->exists()) {
+            return $this->redirectToRoute('login');
+        }
         $error = null;
         if ($request->isMethod('POST')) {
             $password = $request->request->getString('password');
@@ -44,11 +50,18 @@ final class SecurityController extends AbstractController
     #[Route('/login', name: 'login', methods: ['GET', 'POST'])]
     public function login(OwnerProvider $owners, AuthenticationUtils $auth): Response
     {
-        if (!$owners->exists()) { return $this->redirectToRoute('setup'); }
-        if ($this->getUser()) { return $this->redirectToRoute('library'); }
+        if (!$owners->exists()) {
+            return $this->redirectToRoute('setup');
+        }
+        if ($this->getUser()) {
+            return $this->redirectToRoute('library');
+        }
         return $this->render('security/login.html.twig', ['error' => $auth->getLastAuthenticationError()]);
     }
 
     #[Route('/logout', name: 'logout', methods: ['POST'])]
-    public function logout(): never { throw new \LogicException('Handled by Symfony Security.'); }
+    public function logout(): never
+    {
+        throw new \LogicException('Handled by Symfony Security.');
+    }
 }

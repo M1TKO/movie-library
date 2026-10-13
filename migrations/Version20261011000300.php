@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
@@ -7,7 +9,10 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20261011000300 extends AbstractMigration
 {
-    public function getDescription(): string { return 'Local candidate identities and configurable discovery defaults'; }
+    public function getDescription(): string
+    {
+        return 'Local candidate identities and configurable discovery defaults';
+    }
     public function up(Schema $schema): void
     {
         $this->addSql('ALTER TABLE movies ADD COLUMN local_identity TEXT');
