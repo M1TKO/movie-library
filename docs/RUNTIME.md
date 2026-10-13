@@ -44,7 +44,9 @@ powershell -File scripts/Start.ps1
 
 On Linux use `export APP_DATA_DIR=/absolute/project/path/var/dev`. Production and development cache directories remain separate. Migrations are additive and preserve owner credentials and locations. Automated tests always use separate data; runtime smoke tests use randomly named `var/runtime-smoke-*` directories containing synthetic records.
 
-Data includes the SQLite database/WAL, generated secret, sessions, cache, logs, Caddy storage and supervisor ownership file. Serve only `public/`. Ordinary backups/restores are not implemented yet; do not copy a live SQLite database as if it were a consistent backup.
+Data includes the SQLite database/WAL, generated secret, sessions, cache, logs, Caddy storage and supervisor ownership file. Serve only `public/`.
+
+Use `php bin/console app:backup` for a consistent catalog snapshot under `APP_DATA_DIR/backups/`. To restore, stop the application and workers, then run `php bin/console app:restore "BACKUP_DIRECTORY"` from the local owner terminal. Validation, a pre-restore backup, and atomic replacement are performed automatically; credentials are preserved and active jobs are marked interrupted.
 
 ## Workers and troubleshooting
 

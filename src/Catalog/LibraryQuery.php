@@ -17,7 +17,8 @@ final class LibraryQuery
         $matching = $pick('matching', ['','pending','auto_matched','manually_confirmed','needs_review','unmatched'], '');
         $watched = $pick('watched', ['','watched','unwatched','partial'], '');
         $resolution = $pick('resolution', ['','unknown','720','1080','2160'], '');
-        $perPage = (int)$pick('per_page', ['25','50','100'], '50');
+        $defaultPage=(string)$this->db->fetchOne("SELECT value FROM settings WHERE name='page_size'");
+        $perPage = (int)$pick('per_page', ['25','50','100'], in_array($defaultPage,['25','50','100'],true)?$defaultPage:'50');
         $q = mb_substr(trim($request->query->getString('q')), 0, 200);
         $location = max(0, $request->query->getInt('location'));
         $params = []; $where = [];
@@ -38,8 +39,8 @@ final class LibraryQuery
                 if ($view === 'movies') { $where[]=$watched==='partial' ? '0=1' : 't.watched='.($watched==='watched'?1:0); }
                 else {
                     $episodes='SELECT e.watched FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id=t.id AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)';
-                    $hasWatched='EXISTS(SELECT 1 FROM ('.$episodes.') ew WHERE ew.watched=1)';
-                    $hasUnwatched='EXISTS(SELECT 1 FROM ('.$episodes.') ew WHERE ew.watched=0)';
+                    $hasWatched='t.id IN (SELECT s.series_id FROM seasons s JOIN episodes e ON e.season_id=s.id WHERE e.watched=1 AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id))';
+                    $hasUnwatched='t.id IN (SELECT s.series_id FROM seasons s JOIN episodes e ON e.season_id=s.id WHERE e.watched=0 AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id))';
                     $where[]=match($watched) { 'watched'=>$hasWatched.' AND NOT '.$hasUnwatched, 'unwatched'=>$hasUnwatched.' AND NOT '.$hasWatched, 'partial'=>$hasWatched.' AND '.$hasUnwatched };
                 }
             }
@@ -69,15 +70,15 @@ final class LibraryQuery
         } unset($row);
         if ($titleView) {
             $links=$view==='movies' ? 'SELECT l.file_id FROM file_content_links l WHERE l.movie_id IN (SELECT id FROM selected)' : 'SELECT l.file_id FROM file_content_links l JOIN episodes e ON e.id=l.episode_id JOIN seasons s ON s.id=e.season_id WHERE s.series_id IN (SELECT id FROM selected)';
-            $physical='WITH selected AS ('.$filtered.') SELECT f.* FROM media_files f WHERE f.id IN ('.$links.')';
+            $physical='WITH selected AS MATERIALIZED ('.$filtered.') SELECT f.* FROM media_files f WHERE f.id IN ('.$links.')';
         } else { $physical=$filtered; }
         $totals=$this->db->fetchAssociative("SELECT COUNT(*) files, COALESCE(SUM(CASE WHEN check_outcome='available' THEN 1 ELSE 0 END),0) available, COALESCE(SUM(CASE WHEN check_outcome='missing' THEN 1 ELSE 0 END),0) missing, COALESCE(SUM(CASE WHEN check_outcome NOT IN ('available','missing') THEN 1 ELSE 0 END),0) uncheckable, COALESCE(SUM(size_bytes),0) bytes, COALESCE(SUM(CASE WHEN check_outcome='available' THEN size_bytes ELSE 0 END),0) available_bytes FROM (".$physical.') physical',$params);
         if ($titleView && $view==='movies') {
-            $watchedSql='WITH selected AS ('.$filtered.') SELECT watched FROM selected';
+            $watchedSql='WITH selected AS MATERIALIZED ('.$filtered.') SELECT watched FROM selected';
         } elseif ($titleView) {
-            $watchedSql='WITH selected AS ('.$filtered.') SELECT e.watched FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id IN (SELECT id FROM selected) AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)';
+            $watchedSql='WITH selected AS MATERIALIZED ('.$filtered.') SELECT e.watched FROM episodes e JOIN seasons s ON s.id=e.season_id WHERE s.series_id IN (SELECT id FROM selected) AND EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id)';
         } else {
-            $watchedSql='WITH selected AS ('.$filtered.') SELECT m.watched FROM movies m WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.movie_id=m.id AND l.file_id IN (SELECT id FROM selected)) UNION ALL SELECT e.watched FROM episodes e WHERE EXISTS(SELECT 1 FROM file_content_links l WHERE l.episode_id=e.id AND l.file_id IN (SELECT id FROM selected))';
+            $watchedSql='WITH selected AS MATERIALIZED ('.$filtered.') SELECT m.watched FROM movies m WHERE m.id IN (SELECT l.movie_id FROM file_content_links l JOIN selected f ON f.id=l.file_id WHERE l.movie_id IS NOT NULL) UNION ALL SELECT e.watched FROM episodes e WHERE e.id IN (SELECT l.episode_id FROM file_content_links l JOIN selected f ON f.id=l.file_id WHERE l.episode_id IS NOT NULL)';
         }
         $watchedTotals=$this->db->fetchAssociative('SELECT COUNT(*) titles,COALESCE(SUM(watched),0) watched,COALESCE(SUM(watched=0),0) unwatched FROM ('.$watchedSql.') content',$params);
         $seriesStates=$view==='series'?(new Experience($this->db))->seriesStates($filtered,$params):null;

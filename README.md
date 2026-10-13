@@ -2,7 +2,7 @@
 
 A personal movie and TV catalog for **Windows and Linux**, implemented in phases from [the project specification](Movie-Library-Specification.md). Both platforms are required release targets.
 
-**Phases 2–5 are implemented.** Manually scan selected locations, browse and filter movies/TV and unresolved copies, inspect files with FFprobe, manage or relocate roots, check availability, and review TMDB metadata. TV navigation includes specials, seasons, episodes and every copy; watched changes retain timestamps/history and offer catalog-only bulk previews. Whole-library and filtered totals deduplicate physical storage. Copy paths from detail pages; optional authenticated folder/play actions run on an explicitly configured host desktop. Phase 6 release features are next. See [IMPLEMENTATION.md](IMPLEMENTATION.md), [validation results](docs/VALIDATION.md) and [TMDB setup](docs/TMDB.md). Current Linux validation remains pending because Docker is stopped.
+**Phases 2–6 are implemented.** Manually scan selected locations, browse and filter movies/TV and unresolved copies, inspect files with FFprobe, manage or relocate roots, check availability, and review TMDB metadata. TV navigation includes specials, seasons, episodes and every copy; watched changes retain timestamps/history and offer catalog-only bulk previews. Whole-library and filtered totals deduplicate physical storage. Copy paths from detail pages; optional authenticated folder/play actions run on an explicitly configured host desktop. See [IMPLEMENTATION.md](IMPLEMENTATION.md), [validation results](docs/VALIDATION.md) and [TMDB setup](docs/TMDB.md). Current Linux validation remains pending because Docker is stopped.
 
 ## Normal application startup
 
@@ -82,7 +82,7 @@ Required extensions are checked by `scripts/Check-Dependencies.ps1`: ctype, icon
 | Normal launcher logs / runtime ownership | `logs/{http,php-fastcgi,filesystem,metadata}.log`, `runtime.json` under the platform data directory |
 | TMDB encrypted credential (excluded from catalog backups) | `tmdb.secret` under APP_DATA_DIR |
 | Poster cache (bounded to 100 MiB) | `posters/` under APP_DATA_DIR |
-| Backup outputs | Not implemented yet |
+| Backup outputs | `backups/{timestamp-id}/catalog.sqlite` and `manifest.json` under APP_DATA_DIR |
 
 The development launcher explicitly sets `APP_DATA_DIR` to `var/dev`; tests force `var/test` regardless of inherited settings. To choose another local data directory for development, set `$env:APP_DATA_DIR` before both start and stop. Keep SQLite on a local disk. For manual console commands against the development database, set it as follows:
 
@@ -122,3 +122,4 @@ For continuation, use the **Next task** in [IMPLEMENTATION.md](IMPLEMENTATION.md
 Use a movie or episode's watched link to preview and confirm a change. Series and season actions show the number of cataloged episodes they affect, including missing copies. Newly discovered episodes start unwatched. If the catalog or watched state changes after preview, confirmation returns a conflict and a refreshed preview. Playback leaves watched state unchanged.
 
 Host actions are off by default. Run the backend under your logged-in desktop account, set `MOVIE_LIBRARY_INTERACTIVE_DESKTOP=1` in that launcher's environment, restart it, then enable host actions in Settings. Windows also requires a non-service `SESSIONNAME`; Linux requires `DISPLAY` or `WAYLAND_DISPLAY`, `xdg-open`, and a default media-player association. Keep this variable unset for services, headless hosts and containers. The setting cannot enable actions without the desktop configuration. Each request uses a catalog file ID, requires authentication and CSRF, checks the latest available outcome, and launches a fixed platform command with a five-second timeout. Failures are shown on the file page; Copy path stays available.
+

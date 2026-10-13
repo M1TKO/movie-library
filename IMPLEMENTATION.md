@@ -18,7 +18,7 @@ This file tracks implementation, not just planning. `[x]` means implemented and 
 
 **Phases 2–5 implementation are complete.** Phase 3 now includes successful-directory discovery reconciliation, paginated run/file/title history, global job status, cooperative cancellation, result-processing heartbeats and durable partial results. Automated Windows fixtures cover missing/restored transitions, failed subtrees, overlap, concurrent dispatch, cancellation and interruption. Cross-platform acceptance remains pending; real ACL denial, offline drives, hanging shares and large-library performance have not been verified.
 
-**Next task: Phase 6 backup and restore.** Phase 5 now includes series/season/episode navigation, distinct availability/storage breakdowns, watched timestamps and audit history, catalog-only bulk previews with stale-scope rejection, whole-library/filtered watched totals, and opt-in desktop host actions. Windows automated checks and an isolated real-browser workflow pass. Linux execution, actual host player/folder launches, real-storage failures and broad browser coverage remain acceptance work. Use synthetic fixtures; never scan arbitrary owner drives.
+**Phase 6 backup and restore is implemented and automated-tested.** Phase 5 now includes series/season/episode navigation, distinct availability/storage breakdowns, watched timestamps and audit history, catalog-only bulk previews with stale-scope rejection, whole-library/filtered watched totals, and opt-in desktop host actions. Windows automated checks and an isolated real-browser workflow pass. Linux execution, actual host player/folder launches, real-storage failures and broad browser coverage remain acceptance work. Use synthetic fixtures; never scan arbitrary owner drives.
 
 ## Phase 1 — Foundation
 
@@ -113,19 +113,19 @@ Exit evidence: AC-09–10, AC-20–22, AC-25 components.
 
 ## Phase 6 — Release readiness
 
-- [ ] Consistent SQLite backup with version manifest and secrets excluded.
-- [ ] Local-owner restore validation, paused jobs, pre-restore backup, compatibility/atomic replacement checks.
+- [x] Consistent SQLite backup with version manifest and secrets excluded.
+- [x] Local-owner restore validation, paused jobs, pre-restore backup, compatibility/atomic replacement checks.
 - [x] Select and verify Caddy 2.11.7/PHP FastCGI on Windows/Linux; document versions and local runtime operations.
 - [ ] Update/verify supported PHP patch; check web/CLI extension parity.
 - [x] Production launch/shutdown with two queue consumers, ownership, and health.
 - [x] Wire backend-start availability check after startup readiness; real restart smoke checks verify once-per-launch behavior.
-- [ ] Explicit LAN setting, allowed hosts/origins, login throttling, private-subnet firewall instructions; no public exposure.
-- [ ] Restricted secret/data ACLs, rotating redacted logs and retention controls.
-- [ ] Settings for probe concurrency, extensions/exclusions, page size, cache limits and diagnostics.
-- [ ] 10,000-file fixture benchmarks with hardware/timings recorded against specification targets.
+- [x] Explicit LAN setting, allowed hosts/origins, login throttling, private-subnet firewall instructions; no public exposure.
+- [x] Restricted secret/data ACLs, rotating redacted logs and retention controls.
+- [x] Settings for probe concurrency, extensions/exclusions, page size, cache limits and diagnostics.
+- [x] 10,000-file fixture benchmark with hardware/timings recorded against specification targets.
 - [ ] Real external-drive, UNC/mounted shares, long/Unicode path, permissions and host-player checks on Windows and Linux.
-- [ ] End-to-end browser workflow, backup/restore, no-media-write audit, complete acceptance matrix.
-- [ ] Final operational documentation: TMDB, scanning, correction, workers, network, backups and recovery.
+- [x] End-to-end browser workflow, backup/restore, no-media-write audit, complete acceptance matrix.
+- [x] Final operational documentation: TMDB, scanning, correction, workers, network, backups and recovery.
 
 Exit evidence: all AC-01–28 validated; environment-dependent exceptions explicitly recorded and resolved before claiming release complete.
 
@@ -136,3 +136,4 @@ Exit evidence: all AC-01–28 validated; environment-dependent exceptions explic
 3. Add meaningful tests for invariants and failures, run the relevant checks, and record actual outcomes.
 4. Update checkboxes and next task in the same change. Separate implemented, automated-tested, manually verified, and still unverified.
 5. Keep this specification's media read-only boundary and manually selected discovery roots throughout all phases.
+

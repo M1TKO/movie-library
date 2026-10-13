@@ -65,7 +65,7 @@ final class DiscoverHandler
         $known = [];
         foreach ($this->db->fetchAllAssociative('SELECT normalized_path,size_bytes,modified_at,probe_state FROM media_files') as $file) { $known[$file['normalized_path']] = $file; }
         $input = ['root'=>$root['root_path'],'recursive'=>(bool)$root['recursive'],'exclusions'=>json_decode($root['exclusions'], true, 512, JSON_THROW_ON_ERROR),
-            'extensions'=>$options['extensions'],'ffprobe'=>$options['ffprobe'],'known'=>$known];
+            'probe_concurrency'=>$options['probe_concurrency']??1,'extensions'=>$options['extensions'],'ffprobe'=>$options['ffprobe'],'known'=>$known];
         $process = new Process([PHP_BINARY, dirname(__DIR__, 2).'/bin/discover-root.php'], dirname(__DIR__, 2), null, json_encode($input, JSON_THROW_ON_ERROR), $timeout);
         $directories = [];
         $buffer = ''; $done = false; $errors = false; $lastBeat = 0.0;

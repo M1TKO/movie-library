@@ -4,6 +4,6 @@ services:
         autoconfigure: true
     App\:
         resource: '../src/'
-        exclude: '../src/{Kernel.php,Security/Owner.php,Message/}'
+        exclude: '../src/{Kernel.php,Security/Owner.php,Message/,Maintenance/RuntimeLog.php}'
 
     App\Metadata\Provider: '@App\Metadata\TmdbProvider'

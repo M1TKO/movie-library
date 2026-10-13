@@ -14,7 +14,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Symfony\Component\Process\{Process, ExecutableFinder};
 
-#[AsCommand(name: 'app:serve', description: 'Supervise Caddy, PHP FastCGI, and both durable workers on localhost')]
+#[AsCommand(name: 'app:serve', description: 'Supervise Caddy, PHP FastCGI, and both workers on localhost or an explicit private LAN address')]
 final class ServeCommand extends Command
 {
     public function __construct(private readonly Connection $db, private readonly MessageBusInterface $bus, private readonly \App\Availability\CheckDispatcher $checks) { parent::__construct(); }
@@ -31,6 +31,7 @@ final class ServeCommand extends Command
         $port = $this->port($input->getOption('port'));
         $fcgiPort = $this->port($input->getOption('fcgi-port'));
         if ($port === $fcgiPort) { throw new \RuntimeException('HTTP and FastCGI ports must differ.'); }
+        $address='127.0.0.1';
         $root = dirname(__DIR__, 2);
         $data = $_SERVER['APP_DATA_DIR'];
         $lock = (new LockFactory(new FlockStore($data)))->createLock('application-supervisor');
@@ -40,8 +41,18 @@ final class ServeCommand extends Command
         $stateFile = $data.'/runtime.json';
         $stopFile = $data.'/stop-request';
         $stateWritten = false;
-        $logHandles = [];
+        $logs = [];
         try {
+            $restoreLock=(new LockFactory(new FlockStore($data)))->createLock('catalog-restore');
+            if (!$restoreLock->acquire()) { throw new \RuntimeException('Catalog restore is active.'); }
+            $restoreLock->release();
+            if (PHP_OS_FAMILY==='Windows') {
+                (new Process(['powershell','-NoProfile','-ExecutionPolicy','Bypass','-File',$root.'/scripts/Protect-Data.ps1','-Data',$data],$root,null,null,60))->mustRun();
+            } else {
+                chmod($data,0700);
+                foreach (['library.sqlite','library.sqlite-wal','library.sqlite-shm','app.secret','tmdb.secret'] as $file) { if (is_file($data.'/'.$file)) { chmod($data.'/'.$file,0600); } }
+                foreach (['sessions','cache','logs','posters','backups'] as $dir) { if (is_dir($data.'/'.$dir)) { chmod($data.'/'.$dir,0700); } }
+            }
             $finder = new ExecutableFinder();
             $caddyOption = $input->getOption('caddy');
             $cgiOption = $input->getOption('php-cgi');
@@ -49,16 +60,27 @@ final class ServeCommand extends Command
             $cgi = is_file($cgiOption) ? realpath($cgiOption) : $finder->find($cgiOption);
             if (!$caddy || !$cgi) { throw new \RuntimeException('Caddy and php-cgi are required. Supply --caddy and --php-cgi paths or add them to PATH.'); }
             foreach ([$port,$fcgiPort] as $checkPort) {
-                $socket = @stream_socket_server('tcp://127.0.0.1:'.$checkPort, $errno, $error);
+                $socket = @stream_socket_server('tcp://'.($checkPort===$port?$address:'127.0.0.1').':'.$checkPort, $errno, $error);
                 if (!$socket) { throw new \RuntimeException('Port '.$checkPort.' is already occupied: '.$error); }
                 fclose($socket);
             }
             $env = ['APP_ENV'=>'prod','APP_DEBUG'=>'0','APP_DATA_DIR'=>$data,'APP_INSTANCE_ID'=>$instance,
-                'APP_HTTP_PORT'=>(string)$port,'APP_FCGI_PORT'=>(string)$fcgiPort,'APP_PUBLIC_DIR'=>str_replace('\\','/',$root.'/public'),
+                'APP_BIND_ADDRESS'=>$address==='127.0.0.1'?$address:'127.0.0.1 '.$address,'APP_HTTP_PORT'=>(string)$port,'APP_FCGI_PORT'=>(string)$fcgiPort,'APP_PUBLIC_DIR'=>str_replace('\\','/',$root.'/public'),
                 'PHP_FCGI_MAX_REQUESTS'=>'0'];
             $migration = new Process([PHP_BINARY,'bin/console','doctrine:migrations:migrate','--no-interaction'], $root, $env, null, 60);
             $migration->mustRun();
             $this->db->close();
+            if ($this->db->fetchOne("SELECT value FROM settings WHERE name='lan_enabled'")==='true') {
+                $address=(string)$this->db->fetchOne("SELECT value FROM settings WHERE name='lan_address'");
+                if (!\App\Security\NetworkPolicy::privateAddress($address) || !$this->db->fetchOne('SELECT COUNT(*) FROM owner_auth')) { throw new \RuntimeException('Set up the owner locally and configure a private IPv4 address before enabling LAN.'); }
+            }
+            $env['APP_BIND_ADDRESS']=$address==='127.0.0.1'?$address:'127.0.0.1 '.$address;
+            if ($address!=='127.0.0.1') {
+                $socket=@stream_socket_server('tcp://'.$address.':'.$port,$errno,$error);
+                if (!$socket) { throw new \RuntimeException('Cannot bind configured LAN address: '.$error); }
+                fclose($socket);
+            }
+
             // Existing manually started consumers would defeat supervised ownership.
             foreach (['filesystem','metadata'] as $queue) {
                 $probe = (new LockFactory(new FlockStore($data)))->createLock('worker-'.$queue);
@@ -78,11 +100,13 @@ final class ServeCommand extends Command
             if (!is_dir($logDir)) { mkdir($logDir,0700,true); }
             foreach ($commands as $name=>$command) {
                 $log = $logDir.'/'.$name.'.log';
-                if (is_file($log) && filesize($log) > 5*1024*1024) { rename($log,$log.'.previous'); }
-                $handle = fopen($log,'ab');
-                $logHandles[] = $handle;
+                $logger=new \App\Maintenance\RuntimeLog($log,[$_SERVER['APP_SECRET'],(new \App\Metadata\Credentials())->read()]);
+                $logs[]=$logger;
                 $process = new Process($command,$root,$env,null,null);
-                $process->start(static function (string $type, string $buffer) use ($handle): void { fwrite($handle,$buffer); });
+                $verbose=$this->db->fetchOne("SELECT value FROM settings WHERE name='log_level'")==='verbose';
+                $process->start(static function (string $type, string $buffer) use ($logger,$verbose): void {
+                    if ($type===Process::ERR || $verbose) { $logger->append($buffer); }
+                });
                 $children[$name] = $process;
             }
             $state = ['instance'=>$instance,'pid'=>getmypid(),'port'=>$port,'started_at'=>gmdate(DATE_ATOM),'children'=>array_map(fn(Process $p)=>$p->getPid(),$children)];
@@ -121,10 +145,10 @@ final class ServeCommand extends Command
                     $health = $body ? json_decode($body,true) : null;
                     $count = (int)$this->db->fetchOne('SELECT COUNT(*) FROM worker_receipts WHERE id IN (?,?)',$receipts);
                     if (($health['status'] ?? null) === 'ok' && $count === 2) {
-                        if ($health['php'] !== PHP_VERSION || count($health['extensions'] ?? []) !== 6) { throw new \RuntimeException('Web and CLI PHP runtimes/extensions differ.'); }
+                        if ($health['php'] !== PHP_VERSION || count($health['extensions'] ?? []) !== 9) { throw new \RuntimeException('Web and CLI PHP runtimes/extensions differ.'); }
                         $this->checks->dispatch('backend_start');
                         $ready = true;
-                        $output->writeln('Movie Library ready: http://127.0.0.1:'.$port.' (both workers verified)');
+                        $output->writeln('Movie Library ready: http://'.$address.':'.$port.' (both workers verified)');
                         $output->writeln('Data: '.$data.' | Stop using the stop script or Ctrl+C.');
                     } elseif (microtime(true) > $deadline) { throw new \RuntimeException('Startup health check timed out; inspect '.$logDir); }
                 }
@@ -133,7 +157,7 @@ final class ServeCommand extends Command
             return Command::SUCCESS;
         } finally {
             foreach (array_reverse($children) as $process) { $process->stop(3); }
-            foreach ($logHandles as $handle) { fclose($handle); }
+            foreach ($logs as $logger) { $logger->flush(); }
             if ($stateWritten) {
                 $this->db->executeStatement("UPDATE worker_health SET state='stopped', heartbeat_at=? WHERE instance_id=?",[gmdate(DATE_ATOM),$instance]);
                 if (is_file($stateFile)) { unlink($stateFile); }

@@ -61,18 +61,25 @@ final class LibraryController extends AbstractController
             'totals'=>$totals,'seasons'=>$type==='series'?$experience->seasons($id):[],'hostEnabled'=>$this->host->enabled(),'genres'=>json_decode($title['genres'],true)]);
     }
     #[Route('/settings', name: 'settings', methods: ['GET','POST'])]
-    public function settings(Connection $db, Request $request): Response
+    public function settings(Connection $db, Request $request, \App\Maintenance\Preferences $preferences): Response
     {
         $error = null; $probeVersion = null;
         if ($request->isMethod('POST')) {
             if (!$this->isCsrfTokenValid('settings', $request->request->getString('_token'))) { throw $this->createAccessDeniedException('Invalid form token.'); }
             try {
+                $current=$preferences->values();
+                $input=[];
+                foreach (['page_size','probe_concurrency','poster_cache_mib','log_level','retention_days','lan_address'] as $name) { $input[$name]=$request->request->getString($name,$current[$name]); }
+                $input['lan_enabled']=$request->request->getBoolean('lan_enabled')?'true':'false';
+                if (!in_array($request->getClientIp(),['127.0.0.1','::1'],true) && ($input['lan_enabled']!==$current['lan_enabled'] || $input['lan_address']!==$current['lan_address'])) { throw new \InvalidArgumentException('Change network access locally on the host.'); }
+                $release=$preferences->validate($input);
                 $extensions = ScanOptions::extensions($request->request->getString('extensions'));
                 $probe = trim($request->request->getString('ffprobe'));
                 if ($probe === '' || strlen($probe) > 4096 || str_contains($probe, "\0")) { throw new \InvalidArgumentException('Enter an executable name or an absolute FFprobe executable path.'); }
                 $host=$this->host;
                 $enabled=$request->request->getBoolean('host_actions') && $host->desktop();
-                $db->transactional(function () use ($db, $extensions, $probe, $enabled): void {
+                $db->transactional(function () use ($db, $extensions, $probe, $enabled, $release): void {
+                    foreach ($release as $name=>$value) { $db->executeStatement('INSERT INTO settings(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value',[$name,$value]); }
                     $db->update('settings',['value'=>$enabled?'true':'false'],['name'=>'host_actions_enabled']);
                     $db->update('settings', ['value'=>implode(' ', $extensions)], ['name'=>'video_extensions']);
                     $db->update('settings', ['value'=>$probe], ['name'=>'ffprobe_executable']);
@@ -94,6 +101,6 @@ final class LibraryController extends AbstractController
             $workers[] = ['name'=>$name,'status'=>$row && $row['state']==='running' && strtotime($row['heartbeat_at']) >= time()-15 ? 'Running' : 'Stopped or not responding', 'heartbeat'=>$row['heartbeat_at'] ?? 'Never', 'error'=>$row['last_error'] ?? null];
         }
         return $this->render('library/settings.html.twig',['workers'=>$workers,'error'=>$error,'probeVersion'=>$probeVersion,
-            'hostDesktop'=>$this->host->desktop(),'hostEnabled'=>$db->fetchOne("SELECT value FROM settings WHERE name='host_actions_enabled'")==='true','extensions'=>$db->fetchOne("SELECT value FROM settings WHERE name='video_extensions'"),'ffprobe'=>$db->fetchOne("SELECT value FROM settings WHERE name='ffprobe_executable'")]);
+            'preferences'=>$preferences->values(),'hostDesktop'=>$this->host->desktop(),'hostEnabled'=>$db->fetchOne("SELECT value FROM settings WHERE name='host_actions_enabled'")==='true','extensions'=>$db->fetchOne("SELECT value FROM settings WHERE name='video_extensions'"),'ffprobe'=>$db->fetchOne("SELECT value FROM settings WHERE name='ffprobe_executable'")]);
     }
 }

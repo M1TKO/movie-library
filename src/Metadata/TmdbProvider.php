@@ -93,7 +93,7 @@ final class TmdbProvider implements Provider
             $files=glob($dir.'/*.jpg') ?: []; $total=0;
             usort($files,fn($a,$b)=>filemtime($a)<=>filemtime($b));
             foreach ($files as $file) { $total+=filesize($file); }
-            foreach ($files as $file) { if ($total+strlen($body)<=100*1024*1024) { break; } $total-=filesize($file); unlink($file); }
+            foreach ($files as $file) { if ($total+strlen($body)<=max(10,min(1024,(int)($this->db->fetchOne("SELECT value FROM settings WHERE name='poster_cache_mib'")?:100)))*1024*1024) { break; } $total-=filesize($file); unlink($file); }
             $temp=$dir.'/'.$key.'.'.bin2hex(random_bytes(4));
             file_put_contents($temp,$body,LOCK_EX); chmod($temp,0600); rename($temp,$dir.'/'.$key);
         } catch (\Throwable) { /* Missing images never invalidate a match. */ }

@@ -7,7 +7,17 @@ Phase 5 completion review added season watched summaries and distinct storage/av
 - Container lint, all **26 Twig templates**, Composer strict validation, PHP syntax and **3 Node tests** pass.
 - Linux execution remains pending: Docker engine is stopped (confirmed by the missing engine pipe). Actual desktop playback/folder launches and real-storage acceptance remain unverified. Only isolated synthetic fixtures were used.
 
-Next implementation remains Phase 6 backup and restore. Phase 5 implementation is complete; the environment-dependent acceptance limits above remain open.
+
+## Phase 6 validation — 13 October 2026
+
+- Windows PHP 8.4.26 NTS x64 was downloaded from the official PHP release and checksum-verified. The project launcher prefers this ignored runtime when present; CLI and FastCGI use the same runtime and extension configuration.
+- Full Windows PHPUnit: **107 tests, 596 assertions passed**, with one existing environment-dependent skip. `composer check` passed container and Twig lint.
+- Backup/restore coverage passed: consistent `VACUUM INTO` snapshots include a format/schema manifest and checksum, exclude passwords, TMDB credentials, queues, workers, cache and poster data, preserve current owner credentials, create a pre-restore backup, validate integrity/schema, pause active jobs and restore atomically. A real browser backup creation on isolated `var/phase6-browser` produced `backups/20261013-065205-9bfb74a3b426`.
+- Private LAN policy, allowed hosts/origins, login throttling, restricted data ACLs, rotating redacted logs, retention maintenance and release settings have automated coverage. The browser workflow verified sign-in, Settings preference persistence, backup controls and CSRF-protected backup creation.
+- A synthetic 10,000-file benchmark on Windows (AMD Ryzen 7 6800H, 32 GiB RAM, Kingston NV2 2 TB SSD, PHP 8.4.26 / SQLite 3.53.4) passed the targets: first page **167 ms**, warm library/filter responses **under 79 ms**, known-check dispatch **3.71 ms**, scan dispatch **1.77 ms**, peak memory **44 MiB**. Covering association indexes and series watched filters were added after the first run exceeded the target.
+- Native production runtime smoke passed **19 checks** with Caddy 2.11.7, PHP FastCGI, both queue consumers, restart persistence, one-per-launch availability dispatch, private-file rejection, clean shutdown, and worker failure cleanup.
+
+Linux execution remains unverified because Docker Desktop is unavailable in this environment. Real external-drive/UNC or mounted-share failures, ACL denial on real media, host-player launches, and cross-device LAN access remain manual acceptance work; no owner media was scanned or modified.
 
 ## Previous validation — 12 October 2026
 
@@ -25,7 +35,7 @@ Phases 2–5 implementation complete. Cross-platform and real-storage acceptance
 
 **Remaining acceptance:** Linux execution is blocked by the stopped Docker daemon. Real ACL denial, disconnected drives, hanging shares, 10,000-file performance, actual host playback/folder launching, LAN and backup/restore still require validation. No owner media, live TMDB credentials or owner catalog were used.
 
-**Next implementation:** Phase 6 consistent SQLite backup and safe restore, then the remaining release checklist in [IMPLEMENTATION.md](../IMPLEMENTATION.md).
+**Next implementation:** release acceptance on Linux and real storage, then the remaining release checklist in [IMPLEMENTATION.md](../IMPLEMENTATION.md). Phase 6 backup and restore implementation is complete; live deployment validation remains pending.
 
 ## Previous validation � 12 October 2026
 
@@ -106,3 +116,4 @@ Date: 2026-10-11. Phase: **1 complete**. Windows: PHP 8.2.0, SQLite 3.39.2. Debi
 ## Limitations
 
 No owner media was supplied or scanned. No live TMDB, real external-drive/UNC accessibility, ACL denial, FFprobe, host-player, LAN, backup, or performance result is claimed. Location status is always not-yet-checked in this phase. Linux was tested in an isolated Debian container using native Linux processes, not on a desktop with external drives. Docker is a validation tool, not an application dependency. The production supervisor is validated for current infrastructure jobs; long-running scan safety and backend-start availability semantics remain later-phase work.
+

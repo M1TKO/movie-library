@@ -149,6 +149,7 @@ final class DiscoveryTest extends KernelTestCase
         $command = PHP_OS_FAMILY === 'Windows' ? '@echo off'."\r\n".'"'.PHP_BINARY.'" "'.$php.'"'."\r\n" : '#!/bin/sh'."\n".'exec '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($php)."\n";
         file_put_contents($executable,$command); chmod($executable,0700);
         $this->db->update('settings',['value'=>$executable],['name'=>'ffprobe_executable']);
+        $this->db->update('settings',['value'=>'1'],['name'=>'probe_concurrency']);
         return $executable;
     }
 

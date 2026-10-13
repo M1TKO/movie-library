@@ -106,7 +106,7 @@ final class FoundationTest extends WebTestCase
         $client = $this->freshClient();
         $client->request('GET', '/setup');
         self::assertResponseHeaderSame('X-Content-Type-Options', 'nosniff');
-        self::assertResponseHeaderSame('Referrer-Policy', 'no-referrer');
+        self::assertResponseHeaderSame('Referrer-Policy', 'same-origin');
         $client->request('GET', 'http://untrusted.example/setup');
         self::assertResponseStatusCodeSame(400);
     }

@@ -1,3 +1,5 @@
+$projectPhp=Join-Path (Split-Path $PSScriptRoot -Parent) 'tools/php'
+if (Test-Path -LiteralPath (Join-Path $projectPhp 'php.exe')) { $env:PATH=$projectPhp+';'+$env:PATH }
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if (-not (Get-Command php -ErrorAction SilentlyContinue)) { throw 'Install PHP 8.2 or newer and add php.exe to PATH.' }

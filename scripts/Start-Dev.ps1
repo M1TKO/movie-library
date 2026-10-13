@@ -1,4 +1,6 @@
 param([ValidateRange(1024,65535)][int]$Port = 8000)
+$projectPhp=Join-Path (Split-Path $PSScriptRoot -Parent) 'tools/php'
+if (Test-Path -LiteralPath (Join-Path $projectPhp 'php.exe')) { $env:PATH=$projectPhp+';'+$env:PATH }
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location -LiteralPath $root

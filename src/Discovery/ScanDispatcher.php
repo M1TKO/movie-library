@@ -22,6 +22,7 @@ final class ScanDispatcher
             $locations = array_map(static fn(array $row) => array_intersect_key($row, array_flip(['id','label','root_path','normalized_root','recursive','content_hint','exclusions'])), $locations);
             $options = ['roots'=>$locations,
                 'extensions'=>ScanOptions::extensions((string)$this->db->fetchOne("SELECT value FROM settings WHERE name='video_extensions'")),
+                'probe_concurrency'=>max(1,min(2,(int)($this->db->fetchOne("SELECT value FROM settings WHERE name='probe_concurrency'")?:2))),
                 'ffprobe'=>(string)$this->db->fetchOne("SELECT value FROM settings WHERE name='ffprobe_executable'")];
             $key = 'discovery:'.hash('sha256', json_encode($options, JSON_THROW_ON_ERROR));
             $active = $this->db->fetchOne("SELECT id FROM runs WHERE deduplication_key=? AND state IN ('queued','running')", [$key]);

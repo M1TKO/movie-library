@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 use Symfony\Component\Dotenv\Dotenv;
 
+umask(0077);
 require dirname(__DIR__).'/vendor/autoload.php';
 // PHP web SAPIs can omit process environment variables from $_SERVER.
 foreach (['APP_ENV', 'APP_DEBUG', 'APP_DATA_DIR', 'APP_SECRET'] as $key) {
@@ -21,6 +22,7 @@ if (!is_dir($data) && !mkdir($data, 0700, true) && !is_dir($data)) {
     throw new RuntimeException('Cannot create application data directory. Set APP_DATA_DIR to a writable local directory.');
 }
 $data = realpath($data);
+if (PHP_OS_FAMILY !== 'Windows') { chmod($data,0700); }
 if (PHP_OS_FAMILY === 'Windows') { $data = str_replace('\\', '/', $data); }
 $secretPath = $data.'/app.secret';
 if (!is_file($secretPath)) {

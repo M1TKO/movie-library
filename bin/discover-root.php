@@ -29,6 +29,20 @@ try {
     $start = microtime(true);
     $visited = 0;
     $errors = 0;
+    $pending=[];
+    $probeService=new Probe();
+    $concurrency=max(1,min(2,(int)($options['probe_concurrency']??1)));
+    register_shutdown_function(static function () use (&$pending): void { foreach ($pending as $entry) { if ($entry['task'][0]->isRunning()) { $entry['task'][0]->stop(0); } } });
+    $finish=static function () use (&$pending,$probeService): void {
+        $entry=array_shift($pending);
+        $probe=$probeService->finish($entry['task']);
+        $path=$entry['path']; $before=$entry['before'];
+        clearstatcache(true,$path); $after=@stat($path);
+        if ($after===false || $before['size']!==$after['size'] || $before['mtime']!==$after['mtime']) {
+            $probe=['probe_state'=>'retry','probe_error'=>'The file changed during inspection. Scan again when copying has finished.','probed_at'=>gmdate(DATE_ATOM)];
+        }
+        emit(['kind'=>'file','path'=>$path,'relative'=>$entry['relative'],'size'=>$before['size'],'mtime'=>$before['mtime'],'probe'=>$probe]);
+    };
     $stack = [[$root, '']];
     while ($stack) {
         [$directory, $relativeDirectory] = array_pop($stack);
@@ -61,15 +75,15 @@ try {
                 $known = $options['known'][$key] ?? null;
                 $probe = null;
                 if (!$known || (int)$known['size_bytes'] !== $before['size'] || (int)$known['modified_at'] !== $before['mtime'] || $known['probe_state'] !== 'complete') {
-                    $probe = (new Probe())->inspect($path, $options['ffprobe']);
-                    clearstatcache(true, $path);
-                    $after = @stat($path);
-                    if ($after === false || $before['size'] !== $after['size'] || $before['mtime'] !== $after['mtime']) {
-                        $probe = ['probe_state'=>'retry','probe_error'=>'The file changed during inspection. Scan again when copying has finished.','probed_at'=>gmdate(DATE_ATOM)];
-                    }
+                    try {
+                        $pending[]=['path'=>$path,'relative'=>$relative,'before'=>$before,'task'=>$probeService->start($path,$options['ffprobe'])];
+                        if (count($pending)>=$concurrency) { $finish(); }
+                        continue;
+                    } catch (Throwable) { $probe=['probe_state'=>'failed','probe_error'=>'Inspection could not start. Check FFprobe.','probed_at'=>gmdate(DATE_ATOM)]; }
                 }
                 emit(['kind'=>'file','path'=>$path,'relative'=>$relative,'size'=>$before['size'],'mtime'=>$before['mtime'],'probe'=>$probe]);
             }
+            while ($pending) { $finish(); }
             emit(['kind'=>'directory','relative'=>PHP_OS_FAMILY === 'Windows' ? mb_strtolower($relativeDirectory) : $relativeDirectory,'entries'=>$entries]);
         } finally { closedir($handle); }
     }

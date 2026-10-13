@@ -6,23 +6,31 @@ use Symfony\Component\Process\Process;
 
 final class Probe
 {
-    public function inspect(string $path, string $executable): array
+    public function start(string $path,string $executable): array
     {
-        $process = new Process([$executable, '-v', 'error', '-protocol_whitelist', 'file', '-show_streams', '-show_format', '-of', 'json', $path], null, null, null, 10);
+        $process=new Process([$executable,'-v','error','-protocol_whitelist','file','-show_streams','-show_format','-of','json',$path],null,null,null,10);
+        $buffer=(object)['output'=>''];
+        $process->start(static function (string $type,string $chunk) use ($buffer): void {
+            if ($type===Process::OUT) { $buffer->output.=$chunk; }
+            if (strlen($buffer->output)>1024*1024) { throw new \RuntimeException('Inspection output exceeded the limit.'); }
+        });
+        return [$process,$buffer];
+    }
+    public function finish(array $task): array
+    {
+        [$process,$buffer]=$task;
         try {
-            $output = '';
-            $process->run(static function (string $type, string $chunk) use (&$output): void {
-                if ($type === Process::OUT) { $output .= $chunk; }
-                if (strlen($output) > 1024 * 1024) { throw new \RuntimeException('Inspection output exceeded the limit.'); }
-            });
-            if (!$process->isSuccessful()) { throw new \RuntimeException('FFprobe could not read this file. Verify the executable and video format.'); }
-            $data = json_decode($output, true, 64, JSON_THROW_ON_ERROR);
-            return $this->metadata($data);
+            $process->wait();
+            if (!$process->isSuccessful()) { throw new \RuntimeException('Probe failed.'); }
+            return $this->metadata(json_decode($buffer->output,true,64,JSON_THROW_ON_ERROR));
         } catch (\Throwable $e) {
-            return ['probe_state'=>'failed','probe_error'=>$e instanceof \Symfony\Component\Process\Exception\ProcessTimedOutException ? 'FFprobe exceeded its 10 second timeout.' : 'Inspection failed. Check the FFprobe executable and file format.', 'probed_at'=>gmdate(DATE_ATOM)];
-        } finally {
-            if ($process->isRunning()) { $process->stop(0); }
-        }
+            return ['probe_state'=>'failed','probe_error'=>$e instanceof \Symfony\Component\Process\Exception\ProcessTimedOutException ? 'FFprobe exceeded its 10 second timeout.' : 'Inspection failed. Check the FFprobe executable and file format.','probed_at'=>gmdate(DATE_ATOM)];
+        } finally { if ($process->isRunning()) { $process->stop(0); } }
+    }
+    public function inspect(string $path,string $executable): array
+    {
+        try { return $this->finish($this->start($path,$executable)); }
+        catch (\Throwable) { return ['probe_state'=>'failed','probe_error'=>'Inspection failed. Check the FFprobe executable and file format.','probed_at'=>gmdate(DATE_ATOM)]; }
     }
 
     public function metadata(array $data): array

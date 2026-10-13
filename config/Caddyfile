@@ -6,8 +6,8 @@
         root "{$APP_DATA_DIR}/caddy"
     }
 }
-http://127.0.0.1:{$APP_HTTP_PORT} {
-    bind 127.0.0.1
+http://:{$APP_HTTP_PORT} {
+    bind {$APP_BIND_ADDRESS:127.0.0.1}
     root * "{$APP_PUBLIC_DIR}"
     @private path /.env* /composer.* /router.php
     respond @private 404

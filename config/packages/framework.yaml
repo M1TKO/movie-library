@@ -1,6 +1,5 @@
 framework:
     secret: '%env(APP_SECRET)%'
-    trusted_hosts: ['^localhost$', '^127\.0\.0\.1$', '^\[::1\]$']
     csrf_protection: true
     session:
         handler_id: null
@@ -17,3 +16,4 @@ when@test:
         test: true
         session:
             storage_factory_id: session.storage.factory.mock_file
+
