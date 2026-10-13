@@ -48,7 +48,7 @@
     "allow-plugins": false
   },
   "scripts": {
-    "serve": "symfony server:start",
+    "serve": "@php scripts/serve.php",
     "test": "phpunit",
     "check": [
       "@php bin/console lint:container",
